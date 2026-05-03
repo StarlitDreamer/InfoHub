@@ -14,6 +14,7 @@ import (
 	"InfoHub-agent/internal/config"
 	"InfoHub-agent/internal/crawler"
 	"InfoHub-agent/internal/delivery"
+	"InfoHub-agent/internal/processor"
 	"InfoHub-agent/internal/repository"
 	"InfoHub-agent/internal/scheduler"
 	"InfoHub-agent/internal/server"
@@ -47,8 +48,11 @@ func run(ctx context.Context, cfg config.Config, args []string) error {
 
 func runReport(ctx context.Context, cfg config.Config) error {
 	// 根据运行配置选择真实链路或本地演示链路。
-	pipeline := service.NewPipeline(newCrawler(cfg), newAIProcessor(cfg))
-	items, err := pipeline.Run()
+	pipeline := service.NewPipeline(
+		newCrawler(cfg),
+		newAIProcessor(cfg),
+	).WithDedupStore(processor.NewFileDedupStore(cfg.DedupStorePath))
+	items, err := pipeline.RunContext(ctx)
 	if err != nil {
 		return err
 	}

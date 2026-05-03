@@ -15,6 +15,7 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("INFOHUB_SCHEDULE_INTERVAL_SECONDS", "120")
 	t.Setenv("INFOHUB_STORAGE_DIR", "tmp/reports")
 	t.Setenv("INFOHUB_HTTP_ADDR", ":9090")
+	t.Setenv("INFOHUB_DEDUP_STORE_PATH", "tmp/dedup/seen.json")
 
 	cfg := LoadFromEnv()
 
@@ -45,6 +46,10 @@ func TestLoadFromEnv(t *testing.T) {
 	if cfg.HTTPAddr != ":9090" {
 		t.Fatalf("期望 HTTP 地址为 :9090，实际为 %s", cfg.HTTPAddr)
 	}
+
+	if cfg.DedupStorePath != "tmp/dedup/seen.json" {
+		t.Fatalf("期望去重状态路径为 tmp/dedup/seen.json，实际为 %s", cfg.DedupStorePath)
+	}
 }
 
 func TestLoadFromEnvFallsBackToSingleRSSURL(t *testing.T) {
@@ -72,5 +77,9 @@ func TestLoadFromEnvUsesFallbackInterval(t *testing.T) {
 
 	if cfg.HTTPAddr != defaultHTTPAddr {
 		t.Fatalf("期望使用默认 HTTP 地址，实际为 %s", cfg.HTTPAddr)
+	}
+
+	if cfg.DedupStorePath != defaultDedupStorePath {
+		t.Fatalf("期望使用默认去重状态路径，实际为 %s", cfg.DedupStorePath)
 	}
 }

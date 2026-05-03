@@ -20,6 +20,7 @@ func TestRunOnceMode(t *testing.T) {
 	cfg := config.Config{
 		ScheduleInterval: time.Hour,
 		StorageDir:       t.TempDir(),
+		DedupStorePath:   t.TempDir() + "/seen.json",
 	}
 
 	if err := run(context.Background(), cfg, []string{"run-once"}); err != nil {

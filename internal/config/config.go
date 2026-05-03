@@ -11,6 +11,7 @@ import (
 const defaultScheduleInterval = time.Hour
 const defaultStorageDir = "data/reports"
 const defaultHTTPAddr = ":8080"
+const defaultDedupStorePath = "data/dedup/seen.json"
 
 // Config 保存信息汇总 Agent 的运行配置。
 type Config struct {
@@ -23,6 +24,7 @@ type Config struct {
 	ScheduleInterval time.Duration
 	StorageDir       string
 	HTTPAddr         string
+	DedupStorePath   string
 }
 
 // LoadFromEnv 从环境变量加载配置。
@@ -38,6 +40,7 @@ func LoadFromEnv() Config {
 		ScheduleInterval: readDuration("INFOHUB_SCHEDULE_INTERVAL_SECONDS", defaultScheduleInterval),
 		StorageDir:       readString("INFOHUB_STORAGE_DIR", defaultStorageDir),
 		HTTPAddr:         readString("INFOHUB_HTTP_ADDR", defaultHTTPAddr),
+		DedupStorePath:   readString("INFOHUB_DEDUP_STORE_PATH", defaultDedupStorePath),
 	}
 }
 
