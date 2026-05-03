@@ -53,6 +53,11 @@ func buildSingleSource(source config.SourceConfig, options FactoryOptions) (Craw
 			MaxItems:     options.RSSMaxItems,
 			RecentWithin: options.RSSRecentWithin,
 		}), nil
+	case "http_json":
+		if location == "" {
+			return nil, fmt.Errorf("http_json source %q requires location", source.Name)
+		}
+		return NewHTTPJSONCrawler(location, nil), nil
 	case "demo":
 		return NewDemoCrawler(), nil
 	case "":

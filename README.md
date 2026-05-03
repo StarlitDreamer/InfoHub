@@ -122,6 +122,27 @@ Common environment variables:
 - `INFOHUB_MYSQL_TABLE`
 - `INFOHUB_SCHEDULE_INTERVAL_SECONDS`
 
+Source config can also use an explicit `sources` array in JSON:
+
+```json
+{
+  "sources": [
+    {
+      "name": "google-rss",
+      "kind": "rss",
+      "location": "https://blog.google/rss/"
+    },
+    {
+      "name": "custom-api",
+      "kind": "http_json",
+      "location": "https://example.com/news.json"
+    }
+  ]
+}
+```
+
+`http_json` currently accepts either a top-level array or an object with an `items` field. Each item may include `title`, `content`, `source`, `url`, `publish_time`, `tags`, and `score`.
+
 ## HTTP API
 
 Health check:

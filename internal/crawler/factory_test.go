@@ -27,6 +27,23 @@ func TestBuildFromSourcesReturnsSingleRSSCrawler(t *testing.T) {
 	}
 }
 
+func TestBuildFromSourcesReturnsSingleHTTPJSONCrawler(t *testing.T) {
+	crawler, err := BuildFromSources([]config.SourceConfig{
+		{Name: "api-a", Kind: "http_json", Location: "https://example.com/api.json"},
+	}, FactoryOptions{})
+	if err != nil {
+		t.Fatalf("build crawler failed: %v", err)
+	}
+
+	httpJSONCrawler, ok := crawler.(*HTTPJSONCrawler)
+	if !ok {
+		t.Fatalf("expected http json crawler, got %T", crawler)
+	}
+	if httpJSONCrawler.url != "https://example.com/api.json" {
+		t.Fatalf("expected http json location to be preserved, got %s", httpJSONCrawler.url)
+	}
+}
+
 func TestBuildFromSourcesReturnsMultiCrawlerForMultipleSources(t *testing.T) {
 	crawler, err := BuildFromSources([]config.SourceConfig{
 		{Name: "feed-a", Kind: "rss", Location: "https://example.com/a.xml"},
