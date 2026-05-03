@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"InfoHub-agent/internal/config"
+	"InfoHub-agent/internal/crawler"
 	"InfoHub-agent/internal/repository"
 )
 
@@ -199,6 +200,18 @@ func TestBuildAgentRequestPrefersExplicitSources(t *testing.T) {
 	}
 	if request.Context.Sources[0].Name != "custom-demo" || request.Context.Sources[0].Location != "memory://custom" {
 		t.Fatalf("expected explicit source to be used, got %+v", request.Context.Sources[0])
+	}
+}
+
+func TestNewCrawlerFallsBackToDemoWhenSourceBuildFails(t *testing.T) {
+	built := newCrawler(config.Config{
+		Sources: []config.SourceConfig{
+			{Name: "broken", Kind: "rss", Location: ""},
+		},
+	})
+
+	if _, ok := built.(*crawler.DemoCrawler); !ok {
+		t.Fatalf("expected demo fallback crawler, got %T", built)
 	}
 }
 

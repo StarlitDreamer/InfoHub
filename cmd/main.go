@@ -135,29 +135,16 @@ var timeNow = func() time.Time {
 }
 
 func newCrawler(cfg config.Config) crawler.Crawler {
-	sources := cfg.SourcesOrDefault()
-	crawlers := make([]crawler.Crawler, 0, len(sources))
-
-	for _, source := range sources {
-		switch source.Kind {
-		case "rss":
-			crawlers = append(crawlers, crawler.NewRSSCrawler(source.Location, nil, crawler.RSSOptions{
-				MaxItems:     cfg.RSSMaxItems,
-				RecentWithin: cfg.RSSRecentWithin,
-			}))
-		case "demo":
-			crawlers = append(crawlers, crawler.NewDemoCrawler())
-		}
-	}
-
-	if len(crawlers) == 0 {
+	built, err := crawler.BuildFromSources(cfg.SourcesOrDefault(), crawler.FactoryOptions{
+		RSSMaxItems:     cfg.RSSMaxItems,
+		RSSRecentWithin: cfg.RSSRecentWithin,
+	})
+	if err != nil {
+		log.Printf("build crawler failed, fallback to demo source: %v", err)
 		return crawler.NewDemoCrawler()
 	}
-	if len(crawlers) == 1 {
-		return crawlers[0]
-	}
 
-	return crawler.NewMultiCrawler(crawlers)
+	return built
 }
 
 func newAIProcessor(cfg config.Config) ai.Processor {
