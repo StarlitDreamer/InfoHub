@@ -124,6 +124,16 @@ Run report generation:
 POST /reports/run
 ```
 
+Example response:
+
+```json
+{
+  "status": "generated",
+  "item_count": 26,
+  "display_count": 12
+}
+```
+
 Read latest report:
 
 ```http

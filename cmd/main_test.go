@@ -12,7 +12,7 @@ func TestRunRejectsUnknownMode(t *testing.T) {
 	err := run(context.Background(), config.Config{}, []string{"unknown"})
 
 	if err == nil {
-		t.Fatal("期望未知运行模式返回错误")
+		t.Fatal("expected unknown mode to return an error")
 	}
 }
 
@@ -24,32 +24,39 @@ func TestRunOnceMode(t *testing.T) {
 	}
 
 	if err := run(context.Background(), cfg, []string{"run-once"}); err != nil {
-		t.Fatalf("run-once 执行失败：%v", err)
+		t.Fatalf("run-once failed: %v", err)
 	}
 }
 
-func TestRunReportReturnsItemCount(t *testing.T) {
+func TestRunReportReturnsItemAndDisplayCount(t *testing.T) {
 	cfg := config.Config{
 		ScheduleInterval: time.Hour,
 		StorageDir:       t.TempDir(),
 		DedupStorePath:   t.TempDir() + "/seen.json",
+		ReportMaxItems:   2,
 	}
 
 	result, err := runReport(context.Background(), cfg)
 	if err != nil {
-		t.Fatalf("生成日报失败：%v", err)
+		t.Fatalf("runReport failed: %v", err)
 	}
 
 	if result.ItemCount != 3 {
-		t.Fatalf("期望新增 3 条信息，实际为 %d", result.ItemCount)
+		t.Fatalf("expected 3 items, got %d", result.ItemCount)
+	}
+	if result.DisplayCount != 2 {
+		t.Fatalf("expected 2 displayed items, got %d", result.DisplayCount)
 	}
 
 	result, err = runReport(context.Background(), cfg)
 	if err != nil {
-		t.Fatalf("第二次生成日报失败：%v", err)
+		t.Fatalf("second runReport failed: %v", err)
 	}
 
 	if result.ItemCount != 0 {
-		t.Fatalf("期望第二次无新增信息，实际为 %d", result.ItemCount)
+		t.Fatalf("expected 0 items on second run, got %d", result.ItemCount)
+	}
+	if result.DisplayCount != 0 {
+		t.Fatalf("expected 0 displayed items on second run, got %d", result.DisplayCount)
 	}
 }
