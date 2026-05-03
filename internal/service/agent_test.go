@@ -57,6 +57,43 @@ func TestAgentRunStoresSortedItemsAndTrimmedMarkdown(t *testing.T) {
 	}
 }
 
+func TestAgentRunWithRequestCarriesExecutionContext(t *testing.T) {
+	fixedNow := time.Date(2026, 5, 3, 20, 0, 0, 0, time.UTC)
+	agent := NewAgent(
+		staticPipelineRunner{
+			items: []model.NewsItem{
+				{Title: "beta", Content: "body b", Score: 4, PublishTime: fixedNow.Add(-1 * time.Hour)},
+			},
+		},
+		&agentRepositoryStub{},
+		AgentOptions{
+			Now: func() time.Time { return fixedNow },
+		},
+	)
+
+	result, err := agent.RunWithRequest(context.Background(), AgentRequest{
+		Context: ExecutionContext{
+			Trigger: "http",
+			Sources: []Source{
+				{Name: "feed-a", Kind: "rss", Location: "https://example.com/a.xml"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("agent run failed: %v", err)
+	}
+
+	if result.Request.Context.Trigger != "http" {
+		t.Fatalf("expected trigger http, got %s", result.Request.Context.Trigger)
+	}
+	if result.Request.Context.RequestedAt != fixedNow {
+		t.Fatalf("expected requested time %s, got %s", fixedNow, result.Request.Context.RequestedAt)
+	}
+	if len(result.Request.Context.Sources) != 1 || result.Request.Context.Sources[0].Kind != "rss" {
+		t.Fatalf("unexpected sources: %+v", result.Request.Context.Sources)
+	}
+}
+
 func TestAgentRunSendsWebhookWhenConfigured(t *testing.T) {
 	fixedNow := time.Date(2026, 5, 3, 20, 0, 0, 0, time.UTC)
 	sender := &senderStub{}

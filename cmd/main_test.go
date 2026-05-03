@@ -38,7 +38,7 @@ func TestRunReportReturnsItemAndDisplayCount(t *testing.T) {
 		ReportMaxItems:   2,
 	}
 
-	result, err := runReport(context.Background(), cfg)
+	result, err := runReport(context.Background(), cfg, "manual")
 	if err != nil {
 		t.Fatalf("runReport failed: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestRunReportReturnsItemAndDisplayCount(t *testing.T) {
 		t.Fatalf("expected 2 displayed items, got %d", result.DisplayCount)
 	}
 
-	result, err = runReport(context.Background(), cfg)
+	result, err = runReport(context.Background(), cfg, "manual")
 	if err != nil {
 		t.Fatalf("second runReport failed: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestRunReportWithRepositorySavesSortedItemsAndTrimmedMarkdown(t *testing.T)
 	}
 	repo := &captureReportRepository{}
 
-	result, err := runReportWithRepository(context.Background(), cfg, repo)
+	result, err := runReportWithRepository(context.Background(), cfg, repo, "manual")
 	if err != nil {
 		t.Fatalf("runReportWithRepository failed: %v", err)
 	}
@@ -130,12 +130,12 @@ func TestRunReportWithRepositoryStoresEmptyReportWhenNoNewItems(t *testing.T) {
 	}
 
 	firstRepo := &captureReportRepository{}
-	if _, err := runReportWithRepository(context.Background(), cfg, firstRepo); err != nil {
+	if _, err := runReportWithRepository(context.Background(), cfg, firstRepo, "manual"); err != nil {
 		t.Fatalf("first runReportWithRepository failed: %v", err)
 	}
 
 	secondRepo := &captureReportRepository{}
-	result, err := runReportWithRepository(context.Background(), cfg, secondRepo)
+	result, err := runReportWithRepository(context.Background(), cfg, secondRepo, "manual")
 	if err != nil {
 		t.Fatalf("second runReportWithRepository failed: %v", err)
 	}
@@ -151,6 +151,38 @@ func TestRunReportWithRepositoryStoresEmptyReportWhenNoNewItems(t *testing.T) {
 	}
 	if !strings.Contains(secondRepo.record.Markdown, "今日暂无新增信息") {
 		t.Fatalf("expected empty markdown message, got %s", secondRepo.record.Markdown)
+	}
+}
+
+func TestBuildAgentRequestUsesRSSSources(t *testing.T) {
+	cfg := config.Config{
+		RSSURLs: []string{
+			"https://example.com/a.xml",
+			"https://example.com/b.xml",
+		},
+	}
+
+	request := buildAgentRequest(cfg, "http")
+
+	if request.Context.Trigger != "http" {
+		t.Fatalf("expected trigger http, got %s", request.Context.Trigger)
+	}
+	if len(request.Context.Sources) != 2 {
+		t.Fatalf("expected 2 sources, got %d", len(request.Context.Sources))
+	}
+	if request.Context.Sources[0].Kind != "rss" || request.Context.Sources[0].Location != "https://example.com/a.xml" {
+		t.Fatalf("unexpected first source: %+v", request.Context.Sources[0])
+	}
+}
+
+func TestBuildAgentRequestFallsBackToDemoSource(t *testing.T) {
+	request := buildAgentRequest(config.Config{}, "manual")
+
+	if len(request.Context.Sources) != 1 {
+		t.Fatalf("expected 1 source, got %d", len(request.Context.Sources))
+	}
+	if request.Context.Sources[0].Kind != "demo" {
+		t.Fatalf("expected demo source, got %+v", request.Context.Sources[0])
 	}
 }
 

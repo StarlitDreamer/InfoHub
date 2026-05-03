@@ -36,6 +36,26 @@ type Result struct {
 	GeneratedAt  time.Time
 	Markdown     string
 	Items        []model.NewsItem
+	Request      AgentRequest
+}
+
+// Source 定义 Agent 本次执行使用的数据源。
+type Source struct {
+	Name     string
+	Kind     string
+	Location string
+}
+
+// ExecutionContext 描述一次 Agent 执行上下文。
+type ExecutionContext struct {
+	Trigger     string
+	RequestedAt time.Time
+	Sources     []Source
+}
+
+// AgentRequest 表示一次 Agent 任务输入。
+type AgentRequest struct {
+	Context ExecutionContext
 }
 
 // AgentOptions 保存 Agent 运行选项。
@@ -65,6 +85,11 @@ func NewAgent(pipeline PipelineRunner, repo repository.ReportRepository, options
 
 // Run 执行 Agent 主流程。
 func (a *Agent) Run(ctx context.Context) (Result, error) {
+	return a.RunWithRequest(ctx, AgentRequest{})
+}
+
+// RunWithRequest 执行带上下文输入的 Agent 主流程。
+func (a *Agent) RunWithRequest(ctx context.Context, request AgentRequest) (Result, error) {
 	items, err := a.pipeline.RunContext(ctx)
 	if err != nil {
 		return Result{}, err
@@ -96,5 +121,20 @@ func (a *Agent) Run(ctx context.Context) (Result, error) {
 		GeneratedAt:  generatedAt,
 		Markdown:     report,
 		Items:        sortedItems,
+		Request:      normalizeAgentRequest(request, generatedAt),
 	}, nil
+}
+
+func normalizeAgentRequest(request AgentRequest, requestedAt time.Time) AgentRequest {
+	if request.Context.RequestedAt.IsZero() {
+		request.Context.RequestedAt = requestedAt
+	}
+	if request.Context.Trigger == "" {
+		request.Context.Trigger = "manual"
+	}
+	if request.Context.Sources == nil {
+		request.Context.Sources = []Source{}
+	}
+
+	return request
 }

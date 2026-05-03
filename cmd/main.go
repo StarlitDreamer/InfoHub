@@ -43,7 +43,7 @@ func run(ctx context.Context, cfg config.Config, args []string) error {
 
 	switch mode {
 	case "run-once":
-		_, err := runReport(ctx, cfg)
+		_, err := runReport(ctx, cfg, "manual")
 		return err
 	case "schedule":
 		return runSchedule(ctx, cfg)
@@ -54,17 +54,17 @@ func run(ctx context.Context, cfg config.Config, args []string) error {
 	}
 }
 
-func runReport(ctx context.Context, cfg config.Config) (server.ReportResult, error) {
+func runReport(ctx context.Context, cfg config.Config, trigger string) (server.ReportResult, error) {
 	repo, closeRepo, err := newReportRepository(cfg)
 	if err != nil {
 		return server.ReportResult{}, err
 	}
 	defer closeRepo()
 
-	return runReportWithRepository(ctx, cfg, repo)
+	return runReportWithRepository(ctx, cfg, repo, trigger)
 }
 
-func runReportWithRepository(ctx context.Context, cfg config.Config, repo repository.ReportRepository) (server.ReportResult, error) {
+func runReportWithRepository(ctx context.Context, cfg config.Config, repo repository.ReportRepository, trigger string) (server.ReportResult, error) {
 	pipeline := service.NewPipeline(
 		newCrawler(cfg),
 		newAIProcessor(cfg),
@@ -79,7 +79,7 @@ func runReportWithRepository(ctx context.Context, cfg config.Config, repo reposi
 	}
 
 	agent := service.NewAgent(pipeline, repo, options)
-	result, err := agent.Run(ctx)
+	result, err := agent.RunWithRequest(ctx, buildAgentRequest(cfg, trigger))
 	if err != nil {
 		return server.ReportResult{}, err
 	}
@@ -96,7 +96,7 @@ func runSchedule(ctx context.Context, cfg config.Config) error {
 	defer stop()
 
 	job := func(context.Context) error {
-		_, err := runReport(ctx, cfg)
+		_, err := runReport(ctx, cfg, "schedule")
 		return err
 	}
 	task := scheduler.New(cfg.ScheduleInterval, job)
@@ -124,7 +124,7 @@ func runServer(cfg config.Config) error {
 	defer closeRepo()
 
 	router := server.NewRouter(repo, func(ctx context.Context) (server.ReportResult, error) {
-		return runReportWithRepository(ctx, cfg, repo)
+		return runReportWithRepository(ctx, cfg, repo, "http")
 	}, server.Options{AuthToken: cfg.AuthToken})
 
 	return router.Run(cfg.HTTPAddr)
@@ -160,6 +160,32 @@ func newAIProcessor(cfg config.Config) ai.Processor {
 	}
 
 	return ai.NewMockProcessor()
+}
+
+func buildAgentRequest(cfg config.Config, trigger string) service.AgentRequest {
+	sources := make([]service.Source, 0, len(cfg.RSSURLs))
+	if cfg.UseRSS() {
+		for _, url := range cfg.RSSURLs {
+			sources = append(sources, service.Source{
+				Name:     url,
+				Kind:     "rss",
+				Location: url,
+			})
+		}
+	} else {
+		sources = append(sources, service.Source{
+			Name:     "demo",
+			Kind:     "demo",
+			Location: "in-memory",
+		})
+	}
+
+	return service.AgentRequest{
+		Context: service.ExecutionContext{
+			Trigger: trigger,
+			Sources: sources,
+		},
+	}
 }
 
 func newDedupStore(cfg config.Config) processor.DedupStore {
