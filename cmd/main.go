@@ -71,6 +71,7 @@ func runReportWithRepository(ctx context.Context, cfg config.Config, repo reposi
 	).WithDedupStore(newDedupStore(cfg))
 	options := service.AgentOptions{
 		SendEmptyReport: cfg.SendEmptyReport,
+		GroupBySource:   cfg.ReportGroupBySource,
 		ReportMaxItems:  cfg.ReportMaxItems,
 		Now:             timeNow,
 	}

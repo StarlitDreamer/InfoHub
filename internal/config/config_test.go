@@ -119,7 +119,7 @@ func TestLoadFromJSONFile(t *testing.T) {
 	content := `{
   "sources": [{"enabled": true, "name": "primary", "kind": "rss", "location": "https://example.com/source.xml", "timeout_seconds": 15, "headers": {"Authorization": "Bearer token"}}],
   "rss": {"urls": ["https://example.com/a.xml", "https://example.com/b.xml"], "max_items_per_feed": 10, "recent_within_hours": 48},
-  "report": {"max_items": 15},
+  "report": {"max_items": 15, "group_by_source": true},
   "ai": {"endpoint": "https://api.example.com/v1/chat/completions", "api_key": "file-key", "model": "file-model"},
   "webhook": {"url": "https://example.com/webhook", "send_empty_report": true},
   "storage": {"dir": "file/reports"},
@@ -151,6 +151,9 @@ func TestLoadFromJSONFile(t *testing.T) {
 	}
 	if cfg.RSSMaxItems != 10 || cfg.RSSRecentWithin != 48*time.Hour || cfg.ReportMaxItems != 15 {
 		t.Fatalf("unexpected RSS trimming config: %+v", cfg)
+	}
+	if !cfg.ReportGroupBySource {
+		t.Fatal("expected report grouping to be enabled")
 	}
 	if cfg.AIAPIKey != "file-key" {
 		t.Fatalf("expected file AI key, got %s", cfg.AIAPIKey)

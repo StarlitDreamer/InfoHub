@@ -118,6 +118,33 @@ func TestAgentRunSendsWebhookWhenConfigured(t *testing.T) {
 	}
 }
 
+func TestAgentRunCanGroupMarkdownBySource(t *testing.T) {
+	fixedNow := time.Date(2026, 5, 3, 20, 0, 0, 0, time.UTC)
+	repo := &agentRepositoryStub{}
+	agent := NewAgent(
+		staticPipelineRunner{
+			items: []model.NewsItem{
+				{Title: "a", Content: "summary a", Source: "OpenAI News", Score: 5, PublishTime: fixedNow.Add(-1 * time.Hour)},
+				{Title: "b", Content: "summary b", Source: "Google Blog", Score: 4, PublishTime: fixedNow.Add(-2 * time.Hour)},
+			},
+		},
+		repo,
+		AgentOptions{
+			GroupBySource: true,
+			Now:           func() time.Time { return fixedNow },
+		},
+	)
+
+	result, err := agent.Run(context.Background())
+	if err != nil {
+		t.Fatalf("agent run failed: %v", err)
+	}
+
+	if !strings.Contains(result.Markdown, "### 来源：Google Blog") || !strings.Contains(result.Markdown, "### 来源：OpenAI News") {
+		t.Fatalf("expected grouped markdown, got %s", result.Markdown)
+	}
+}
+
 func TestAgentRunSkipsEmptyWebhookByDefault(t *testing.T) {
 	agent := NewAgent(
 		staticPipelineRunner{},

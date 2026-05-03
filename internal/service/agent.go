@@ -15,6 +15,7 @@ type Agent struct {
 	repo            repository.ReportRepository
 	webhookSender   MarkdownSender
 	sendEmptyReport bool
+	groupBySource   bool
 	reportMaxItems  int
 	now             func() time.Time
 }
@@ -62,6 +63,7 @@ type AgentRequest struct {
 type AgentOptions struct {
 	WebhookSender   MarkdownSender
 	SendEmptyReport bool
+	GroupBySource   bool
 	ReportMaxItems  int
 	Now             func() time.Time
 }
@@ -78,6 +80,7 @@ func NewAgent(pipeline PipelineRunner, repo repository.ReportRepository, options
 		repo:            repo,
 		webhookSender:   options.WebhookSender,
 		sendEmptyReport: options.SendEmptyReport,
+		groupBySource:   options.GroupBySource,
 		reportMaxItems:  options.ReportMaxItems,
 		now:             now,
 	}
@@ -98,6 +101,9 @@ func (a *Agent) RunWithRequest(ctx context.Context, request AgentRequest) (Resul
 	sortedItems := SortByDecisionScore(items, a.now())
 	displayItems := LimitItems(sortedItems, a.reportMaxItems)
 	report := delivery.RenderMarkdown(displayItems)
+	if a.groupBySource {
+		report = delivery.RenderMarkdownBySource(displayItems)
+	}
 	generatedAt := a.now()
 
 	record := repository.ReportRecord{

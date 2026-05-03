@@ -150,6 +150,8 @@ Source config can also use an explicit `sources` array in JSON:
 
 `http_json` currently accepts either a top-level array or an object with an `items` field. Each item may include `title`, `content`, `source`, `url`, `publish_time`, `tags`, and `score`.
 
+Set `report.group_by_source` to `true` if you want the generated Markdown report to be grouped by item source.
+
 ## HTTP API
 
 Health check:

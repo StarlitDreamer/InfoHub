@@ -19,28 +19,29 @@ const defaultMySQLTable = "reports"
 
 // Config 保存信息汇总 Agent 的运行配置。
 type Config struct {
-	Sources          []SourceConfig
-	RSSURL           string
-	RSSURLs          []string
-	RSSMaxItems      int
-	RSSRecentWithin  time.Duration
-	ReportMaxItems   int
-	AIEndpoint       string
-	AIAPIKey         string
-	AIModel          string
-	WebhookURL       string
-	ScheduleInterval time.Duration
-	StorageDir       string
-	HTTPAddr         string
-	DedupStorePath   string
-	SendEmptyReport  bool
-	AuthToken        string
-	RedisAddr        string
-	RedisPassword    string
-	RedisDB          int
-	RedisDedupKey    string
-	MySQLDSN         string
-	MySQLTable       string
+	Sources             []SourceConfig
+	RSSURL              string
+	RSSURLs             []string
+	RSSMaxItems         int
+	RSSRecentWithin     time.Duration
+	ReportMaxItems      int
+	ReportGroupBySource bool
+	AIEndpoint          string
+	AIAPIKey            string
+	AIModel             string
+	WebhookURL          string
+	ScheduleInterval    time.Duration
+	StorageDir          string
+	HTTPAddr            string
+	DedupStorePath      string
+	SendEmptyReport     bool
+	AuthToken           string
+	RedisAddr           string
+	RedisPassword       string
+	RedisDB             int
+	RedisDedupKey       string
+	MySQLDSN            string
+	MySQLTable          string
 }
 
 // SourceConfig 定义一个可执行的数据源配置。
@@ -175,6 +176,9 @@ func mergeConfig(base, override Config) Config {
 	if override.ReportMaxItems > 0 {
 		base.ReportMaxItems = override.ReportMaxItems
 	}
+	if override.ReportGroupBySource {
+		base.ReportGroupBySource = true
+	}
 	if override.AIEndpoint != "" {
 		base.AIEndpoint = override.AIEndpoint
 	}
@@ -265,7 +269,8 @@ type fileConfig struct {
 		RecentWithinHours int      `json:"recent_within_hours"`
 	} `json:"rss"`
 	Report struct {
-		MaxItems int `json:"max_items"`
+		MaxItems      int  `json:"max_items"`
+		GroupBySource bool `json:"group_by_source"`
 	} `json:"report"`
 	AI struct {
 		Endpoint string `json:"endpoint"`
@@ -314,26 +319,27 @@ type sourceFileConfig struct {
 
 func (f fileConfig) toConfig() Config {
 	cfg := Config{
-		Sources:         make([]SourceConfig, 0, len(f.Sources)),
-		RSSURL:          f.RSS.URL,
-		RSSURLs:         f.RSS.URLs,
-		RSSMaxItems:     f.RSS.MaxItemsPerFeed,
-		AIEndpoint:      f.AI.Endpoint,
-		AIAPIKey:        f.AI.APIKey,
-		AIModel:         f.AI.Model,
-		WebhookURL:      f.Webhook.URL,
-		SendEmptyReport: f.Webhook.SendEmptyReport,
-		StorageDir:      f.Storage.Dir,
-		HTTPAddr:        f.HTTP.Addr,
-		DedupStorePath:  f.Dedup.StorePath,
-		AuthToken:       f.Auth.Token,
-		RedisAddr:       f.Redis.Addr,
-		RedisPassword:   f.Redis.Password,
-		RedisDB:         f.Redis.DB,
-		RedisDedupKey:   f.Redis.DedupKey,
-		MySQLDSN:        f.MySQL.DSN,
-		MySQLTable:      firstNonEmpty(f.MySQL.Table, defaultMySQLTable),
-		ReportMaxItems:  f.Report.MaxItems,
+		Sources:             make([]SourceConfig, 0, len(f.Sources)),
+		RSSURL:              f.RSS.URL,
+		RSSURLs:             f.RSS.URLs,
+		RSSMaxItems:         f.RSS.MaxItemsPerFeed,
+		AIEndpoint:          f.AI.Endpoint,
+		AIAPIKey:            f.AI.APIKey,
+		AIModel:             f.AI.Model,
+		WebhookURL:          f.Webhook.URL,
+		SendEmptyReport:     f.Webhook.SendEmptyReport,
+		StorageDir:          f.Storage.Dir,
+		HTTPAddr:            f.HTTP.Addr,
+		DedupStorePath:      f.Dedup.StorePath,
+		AuthToken:           f.Auth.Token,
+		RedisAddr:           f.Redis.Addr,
+		RedisPassword:       f.Redis.Password,
+		RedisDB:             f.Redis.DB,
+		RedisDedupKey:       f.Redis.DedupKey,
+		MySQLDSN:            f.MySQL.DSN,
+		MySQLTable:          firstNonEmpty(f.MySQL.Table, defaultMySQLTable),
+		ReportMaxItems:      f.Report.MaxItems,
+		ReportGroupBySource: f.Report.GroupBySource,
 	}
 	for _, source := range f.Sources {
 		enabled := true
