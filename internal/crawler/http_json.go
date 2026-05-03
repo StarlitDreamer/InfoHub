@@ -14,19 +14,21 @@ import (
 
 // HTTPJSONCrawler 从 HTTP JSON 接口采集结构化信息。
 type HTTPJSONCrawler struct {
-	url    string
-	client *http.Client
+	url     string
+	client  *http.Client
+	headers map[string]string
 }
 
 // NewHTTPJSONCrawler 创建 HTTP JSON 采集器。
-func NewHTTPJSONCrawler(url string, client *http.Client) *HTTPJSONCrawler {
+func NewHTTPJSONCrawler(url string, client *http.Client, headers map[string]string) *HTTPJSONCrawler {
 	if client == nil {
 		client = http.DefaultClient
 	}
 
 	return &HTTPJSONCrawler{
-		url:    url,
-		client: client,
+		url:     url,
+		client:  client,
+		headers: headers,
 	}
 }
 
@@ -40,6 +42,9 @@ func (c *HTTPJSONCrawler) Fetch() ([]model.NewsItem, error) {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, c.url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build http_json request for %s: %w", c.url, err)
+	}
+	for key, value := range c.headers {
+		req.Header.Set(key, value)
 	}
 
 	resp, err := c.client.Do(req)

@@ -45,9 +45,12 @@ type Config struct {
 
 // SourceConfig 定义一个可执行的数据源配置。
 type SourceConfig struct {
-	Name     string
-	Kind     string
-	Location string
+	Enabled        bool
+	Name           string
+	Kind           string
+	Location       string
+	TimeoutSeconds int
+	Headers        map[string]string
 }
 
 // Load 先读取 JSON 配置文件，再使用环境变量覆盖。
@@ -95,6 +98,7 @@ func (c Config) SourcesOrDefault() []SourceConfig {
 		result := make([]SourceConfig, 0, len(c.RSSURLs))
 		for _, url := range c.RSSURLs {
 			result = append(result, SourceConfig{
+				Enabled:  true,
 				Name:     url,
 				Kind:     "rss",
 				Location: url,
@@ -104,6 +108,7 @@ func (c Config) SourcesOrDefault() []SourceConfig {
 	}
 
 	return []SourceConfig{{
+		Enabled:  true,
 		Name:     "demo",
 		Kind:     "demo",
 		Location: "in-memory",
@@ -299,9 +304,12 @@ type fileConfig struct {
 }
 
 type sourceFileConfig struct {
-	Name     string `json:"name"`
-	Kind     string `json:"kind"`
-	Location string `json:"location"`
+	Enabled        *bool             `json:"enabled"`
+	Name           string            `json:"name"`
+	Kind           string            `json:"kind"`
+	Location       string            `json:"location"`
+	TimeoutSeconds int               `json:"timeout_seconds"`
+	Headers        map[string]string `json:"headers"`
 }
 
 func (f fileConfig) toConfig() Config {
@@ -328,10 +336,17 @@ func (f fileConfig) toConfig() Config {
 		ReportMaxItems:  f.Report.MaxItems,
 	}
 	for _, source := range f.Sources {
+		enabled := true
+		if source.Enabled != nil {
+			enabled = *source.Enabled
+		}
 		cfg.Sources = append(cfg.Sources, SourceConfig{
-			Name:     source.Name,
-			Kind:     source.Kind,
-			Location: source.Location,
+			Enabled:        enabled,
+			Name:           source.Name,
+			Kind:           source.Kind,
+			Location:       source.Location,
+			TimeoutSeconds: source.TimeoutSeconds,
+			Headers:        cloneStringMap(source.Headers),
 		})
 	}
 
@@ -440,4 +455,17 @@ func firstNonEmpty(values ...string) string {
 	}
 
 	return ""
+}
+
+func cloneStringMap(input map[string]string) map[string]string {
+	if len(input) == 0 {
+		return nil
+	}
+
+	result := make(map[string]string, len(input))
+	for key, value := range input {
+		result[key] = value
+	}
+
+	return result
 }

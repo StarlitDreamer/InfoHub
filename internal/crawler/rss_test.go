@@ -16,7 +16,7 @@ func TestRSSCrawlerFetchesItems(t *testing.T) {
 	}))
 	defer server.Close()
 
-	items, err := NewRSSCrawler(server.URL, server.Client(), RSSOptions{}).Fetch()
+	items, err := NewRSSCrawler(server.URL, server.Client(), nil, RSSOptions{}).Fetch()
 	if err != nil {
 		t.Fatalf("fetch failed: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestRSSCrawlerCleansHTMLDescription(t *testing.T) {
 	}))
 	defer server.Close()
 
-	items, err := NewRSSCrawler(server.URL, server.Client(), RSSOptions{}).Fetch()
+	items, err := NewRSSCrawler(server.URL, server.Client(), nil, RSSOptions{}).Fetch()
 	if err != nil {
 		t.Fatalf("fetch failed: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestRSSCrawlerFiltersByRecentWindowAndMaxItems(t *testing.T) {
 	}))
 	defer server.Close()
 
-	items, err := NewRSSCrawler(server.URL, server.Client(), RSSOptions{
+	items, err := NewRSSCrawler(server.URL, server.Client(), nil, RSSOptions{
 		MaxItems:     2,
 		RecentWithin: 48 * time.Hour,
 		Now: func() time.Time {
@@ -85,7 +85,7 @@ func TestRSSCrawlerIncludesFeedURLInStatusErrors(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := NewRSSCrawler(server.URL, server.Client(), RSSOptions{}).Fetch()
+	_, err := NewRSSCrawler(server.URL, server.Client(), nil, RSSOptions{}).Fetch()
 	if err == nil {
 		t.Fatal("expected fetch to fail")
 	}

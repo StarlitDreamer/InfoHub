@@ -27,7 +27,7 @@ func TestHTTPJSONCrawlerFetchesItemsFromObjectEnvelope(t *testing.T) {
 	}))
 	defer server.Close()
 
-	items, err := NewHTTPJSONCrawler(server.URL, server.Client()).Fetch()
+	items, err := NewHTTPJSONCrawler(server.URL, server.Client(), nil).Fetch()
 	if err != nil {
 		t.Fatalf("fetch failed: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestHTTPJSONCrawlerFetchesItemsFromArrayEnvelope(t *testing.T) {
 	}))
 	defer server.Close()
 
-	items, err := NewHTTPJSONCrawler(server.URL, server.Client()).Fetch()
+	items, err := NewHTTPJSONCrawler(server.URL, server.Client(), nil).Fetch()
 	if err != nil {
 		t.Fatalf("fetch failed: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestHTTPJSONCrawlerIncludesSourceURLInStatusErrors(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := NewHTTPJSONCrawler(server.URL, server.Client()).Fetch()
+	_, err := NewHTTPJSONCrawler(server.URL, server.Client(), nil).Fetch()
 	if err == nil {
 		t.Fatal("expected fetch to fail")
 	}
@@ -89,5 +89,23 @@ func TestHTTPJSONCrawlerIncludesSourceURLInStatusErrors(t *testing.T) {
 	message := err.Error()
 	if !strings.Contains(message, server.URL) || !strings.Contains(message, "status code 502") {
 		t.Fatalf("expected url and status code in error, got %s", message)
+	}
+}
+
+func TestHTTPJSONCrawlerSendsConfiguredHeaders(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Token") != "secret" {
+			t.Fatalf("expected header X-Token=secret, got %s", r.Header.Get("X-Token"))
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	defer server.Close()
+
+	_, err := NewHTTPJSONCrawler(server.URL, server.Client(), map[string]string{
+		"X-Token": "secret",
+	}).Fetch()
+	if err != nil {
+		t.Fatalf("fetch failed: %v", err)
 	}
 }

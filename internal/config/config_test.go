@@ -117,7 +117,7 @@ func TestLoadFromEnvUsesFallbackInterval(t *testing.T) {
 func TestLoadFromJSONFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	content := `{
-  "sources": [{"name": "primary", "kind": "rss", "location": "https://example.com/source.xml"}],
+  "sources": [{"enabled": true, "name": "primary", "kind": "rss", "location": "https://example.com/source.xml", "timeout_seconds": 15, "headers": {"Authorization": "Bearer token"}}],
   "rss": {"urls": ["https://example.com/a.xml", "https://example.com/b.xml"], "max_items_per_feed": 10, "recent_within_hours": 48},
   "report": {"max_items": 15},
   "ai": {"endpoint": "https://api.example.com/v1/chat/completions", "api_key": "file-key", "model": "file-model"},
@@ -145,6 +145,9 @@ func TestLoadFromJSONFile(t *testing.T) {
 	}
 	if len(cfg.Sources) != 1 || cfg.Sources[0].Name != "primary" {
 		t.Fatalf("expected explicit sources config, got %+v", cfg.Sources)
+	}
+	if !cfg.Sources[0].Enabled || cfg.Sources[0].TimeoutSeconds != 15 || cfg.Sources[0].Headers["Authorization"] != "Bearer token" {
+		t.Fatalf("expected source runtime options, got %+v", cfg.Sources[0])
 	}
 	if cfg.RSSMaxItems != 10 || cfg.RSSRecentWithin != 48*time.Hour || cfg.ReportMaxItems != 15 {
 		t.Fatalf("unexpected RSS trimming config: %+v", cfg)

@@ -23,11 +23,12 @@ type RSSOptions struct {
 type RSSCrawler struct {
 	url     string
 	client  *http.Client
+	headers map[string]string
 	options RSSOptions
 }
 
 // NewRSSCrawler 创建 RSS 采集器。
-func NewRSSCrawler(url string, client *http.Client, options RSSOptions) *RSSCrawler {
+func NewRSSCrawler(url string, client *http.Client, headers map[string]string, options RSSOptions) *RSSCrawler {
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -35,7 +36,7 @@ func NewRSSCrawler(url string, client *http.Client, options RSSOptions) *RSSCraw
 		options.Now = time.Now
 	}
 
-	return &RSSCrawler{url: url, client: client, options: options}
+	return &RSSCrawler{url: url, client: client, headers: headers, options: options}
 }
 
 // String 返回当前 RSS 源的标识，便于聚合错误归因。
@@ -48,6 +49,9 @@ func (c *RSSCrawler) Fetch() ([]model.NewsItem, error) {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, c.url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build rss request for %s: %w", c.url, err)
+	}
+	for key, value := range c.headers {
+		req.Header.Set(key, value)
 	}
 
 	resp, err := c.client.Do(req)

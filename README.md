@@ -130,16 +130,23 @@ Source config can also use an explicit `sources` array in JSON:
     {
       "name": "google-rss",
       "kind": "rss",
-      "location": "https://blog.google/rss/"
+      "location": "https://blog.google/rss/",
+      "enabled": true,
+      "timeout_seconds": 10
     },
     {
       "name": "custom-api",
       "kind": "http_json",
-      "location": "https://example.com/news.json"
+      "location": "https://example.com/news.json",
+      "headers": {
+        "Authorization": "Bearer <token>"
+      }
     }
   ]
 }
 ```
+
+`enabled`, `timeout_seconds`, and `headers` are optional per-source runtime settings.
 
 `http_json` currently accepts either a top-level array or an object with an `items` field. Each item may include `title`, `content`, `source`, `url`, `publish_time`, `tags`, and `score`.
 

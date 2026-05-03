@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -41,15 +42,20 @@ func BuildFromSources(sources []config.SourceConfig, options FactoryOptions) (Cr
 }
 
 func buildSingleSource(source config.SourceConfig, options FactoryOptions) (Crawler, error) {
+	if !source.Enabled {
+		return nil, nil
+	}
+
 	kind := strings.ToLower(strings.TrimSpace(source.Kind))
 	location := strings.TrimSpace(source.Location)
+	client := httpClientForSource(source)
 
 	switch kind {
 	case "rss":
 		if location == "" {
 			return nil, fmt.Errorf("rss source %q requires location", source.Name)
 		}
-		return NewRSSCrawler(location, nil, RSSOptions{
+		return NewRSSCrawler(location, client, source.Headers, RSSOptions{
 			MaxItems:     options.RSSMaxItems,
 			RecentWithin: options.RSSRecentWithin,
 		}), nil
@@ -57,12 +63,22 @@ func buildSingleSource(source config.SourceConfig, options FactoryOptions) (Craw
 		if location == "" {
 			return nil, fmt.Errorf("http_json source %q requires location", source.Name)
 		}
-		return NewHTTPJSONCrawler(location, nil), nil
+		return NewHTTPJSONCrawler(location, client, source.Headers), nil
 	case "demo":
 		return NewDemoCrawler(), nil
 	case "":
 		return nil, fmt.Errorf("source %q requires kind", source.Name)
 	default:
 		return nil, fmt.Errorf("unsupported source kind: %s", source.Kind)
+	}
+}
+
+func httpClientForSource(source config.SourceConfig) *http.Client {
+	if source.TimeoutSeconds <= 0 {
+		return nil
+	}
+
+	return &http.Client{
+		Timeout: time.Duration(source.TimeoutSeconds) * time.Second,
 	}
 }
