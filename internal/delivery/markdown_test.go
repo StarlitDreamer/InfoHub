@@ -36,6 +36,9 @@ func TestRenderMarkdownIncludesOverviewAndDecisionFields(t *testing.T) {
 	if !strings.Contains(report, "- 为什么重要：important") {
 		t.Fatal("expected markdown to include importance field")
 	}
+	if !strings.Contains(report, "- 建议动作：加入近期待办") {
+		t.Fatal("expected markdown to include suggested action")
+	}
 	if !strings.Contains(report, "- 原文链接：https://example.com/item") {
 		t.Fatal("expected markdown to include source url")
 	}
@@ -93,6 +96,21 @@ func TestRenderMarkdownOverviewSummarizesSourcesAndTopItems(t *testing.T) {
 	}
 	if !strings.Contains(report, "- 重点关注：alpha；beta；gamma") {
 		t.Fatalf("expected top item summary, got %s", report)
+	}
+}
+
+func TestRecommendActionUsesScoreAndTopicSignals(t *testing.T) {
+	high := recommendAction(model.NewsItem{Score: 5}, structuredSummary{})
+	if !strings.Contains(high, "优先安排评审") {
+		t.Fatalf("expected top score action, got %s", high)
+	}
+
+	database := recommendAction(
+		model.NewsItem{Score: 3, Tags: []string{"Database"}},
+		structuredSummary{WhyImportant: "数据库性能值得关注"},
+	)
+	if !strings.Contains(database, "专项验证") {
+		t.Fatalf("expected database action, got %s", database)
 	}
 }
 

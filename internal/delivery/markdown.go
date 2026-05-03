@@ -86,6 +86,7 @@ func renderItem(builder *strings.Builder, item model.NewsItem) {
 	builder.WriteString(fmt.Sprintf("- 发生了什么：%s\n", summary.WhatHappened))
 	builder.WriteString(fmt.Sprintf("- 为什么重要：%s\n", summary.WhyImportant))
 	builder.WriteString(fmt.Sprintf("- 影响：%s\n", summary.Impact))
+	builder.WriteString(fmt.Sprintf("- 建议动作：%s\n", recommendAction(item, summary)))
 	builder.WriteString(fmt.Sprintf("- 评分：%.0f/5\n", clampScore(item.Score)))
 	if item.URL != "" {
 		builder.WriteString(fmt.Sprintf("- 原文链接：%s\n", item.URL))
@@ -130,6 +131,26 @@ func parseStructuredSummary(item model.NewsItem) structuredSummary {
 	}
 
 	return summary
+}
+
+func recommendAction(item model.NewsItem, summary structuredSummary) string {
+	score := clampScore(item.Score)
+	text := strings.ToLower(strings.Join(item.Tags, " ") + " " + item.Title + " " + summary.WhyImportant + " " + summary.Impact)
+
+	switch {
+	case score >= 5:
+		return "优先安排评审，判断是否需要立即纳入本周行动或技术路线。"
+	case score >= 4:
+		return "加入近期待办，指定负责人跟进原文和后续进展。"
+	case strings.Contains(text, "security") || strings.Contains(text, "安全") || strings.Contains(text, "cyber"):
+		return "转给安全相关负责人评估影响面，并确认是否需要额外检查。"
+	case strings.Contains(text, "database") || strings.Contains(text, "数据库") || strings.Contains(text, "index"):
+		return "结合当前系统瓶颈评估可借鉴点，必要时安排一次专项验证。"
+	case strings.Contains(text, "ai") || strings.Contains(text, "agent") || strings.Contains(text, "模型"):
+		return "记录到 AI 能力跟踪清单，评估是否值得做小范围试用。"
+	default:
+		return "先纳入观察列表，等待更多上下文后再决定是否升级处理。"
+	}
 }
 
 func countHighPriority(items []model.NewsItem) int {
@@ -199,8 +220,7 @@ func normalizeSource(source string) string {
 
 // scoreStars 将 1-5 分评分转换为星级展示。
 func scoreStars(score float64) string {
-	count := int(clampScore(score))
-	return strings.Repeat("⭐", count)
+	return strings.Repeat("⭐", int(clampScore(score)))
 }
 
 func clampScore(score float64) float64 {
