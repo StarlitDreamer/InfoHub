@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -25,6 +26,8 @@ type ReportResult struct {
 type Options struct {
 	AuthToken string
 }
+
+var markdownSectionPattern = regexp.MustCompile(`(?m)^## `)
 
 // NewRouter 创建 HTTP 路由。
 func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Options) *gin.Engine {
@@ -66,9 +69,10 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Op
 		}
 
 		ctx.JSON(http.StatusOK, gin.H{
-			"generated_at": record.GeneratedAt,
-			"markdown":     record.Markdown,
-			"items":        record.Items,
+			"generated_at":  record.GeneratedAt,
+			"markdown":      record.Markdown,
+			"items":         record.Items,
+			"display_count": len(markdownSectionPattern.FindAllStringIndex(record.Markdown, -1)),
 		})
 	})
 

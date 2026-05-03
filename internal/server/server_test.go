@@ -56,7 +56,7 @@ func TestLatestReport(t *testing.T) {
 	repo := newMemoryRepository()
 	_ = repo.Save(context.Background(), repository.ReportRecord{
 		GeneratedAt: time.Date(2026, 5, 3, 16, 0, 0, 0, time.UTC),
-		Markdown:    "# 今日信息",
+		Markdown:    "# 今日信息\n\n## ⭐⭐⭐\n- 标题：测试一\n- 摘要：摘要一\n\n## ⭐⭐\n- 标题：测试二\n- 摘要：摘要二\n",
 		Items:       []model.NewsItem{{Title: "测试"}},
 	})
 	router := NewRouter(repo, func(context.Context) (ReportResult, error) {
@@ -69,6 +69,10 @@ func TestLatestReport(t *testing.T) {
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+
+	if !strings.Contains(recorder.Body.String(), `"display_count":2`) {
+		t.Fatalf("expected latest report response to include display_count, got %s", recorder.Body.String())
 	}
 }
 

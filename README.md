@@ -140,6 +140,8 @@ Read latest report:
 GET /reports/latest
 ```
 
+The latest report response includes `display_count`, which reflects how many items are actually rendered in the Markdown report.
+
 List historical reports:
 
 ```http
