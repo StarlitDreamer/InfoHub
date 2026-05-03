@@ -21,6 +21,8 @@ const defaultMySQLTable = "reports"
 type Config struct {
 	RSSURL           string
 	RSSURLs          []string
+	RSSMaxItems      int
+	RSSRecentWithin  time.Duration
 	AIEndpoint       string
 	AIAPIKey         string
 	AIModel          string
@@ -113,6 +115,12 @@ func mergeConfig(base, override Config) Config {
 	if len(override.RSSURLs) > 0 {
 		base.RSSURLs = override.RSSURLs
 	}
+	if override.RSSMaxItems > 0 {
+		base.RSSMaxItems = override.RSSMaxItems
+	}
+	if override.RSSRecentWithin > 0 {
+		base.RSSRecentWithin = override.RSSRecentWithin
+	}
 	if override.AIEndpoint != "" {
 		base.AIEndpoint = override.AIEndpoint
 	}
@@ -171,6 +179,8 @@ func applyEnv(cfg Config) Config {
 	}
 
 	cfg.RSSURLs = readList("INFOHUB_RSS_URLS", firstNonEmpty(cfg.RSSURL, strings.Join(cfg.RSSURLs, ",")))
+	cfg.RSSMaxItems = readInt("INFOHUB_RSS_MAX_ITEMS_PER_FEED", cfg.RSSMaxItems)
+	cfg.RSSRecentWithin = readHours("INFOHUB_RSS_RECENT_WITHIN_HOURS", cfg.RSSRecentWithin)
 	cfg.AIEndpoint = readString("INFOHUB_AI_ENDPOINT", cfg.AIEndpoint)
 	cfg.AIAPIKey = readString("INFOHUB_AI_API_KEY", cfg.AIAPIKey)
 	cfg.AIModel = readString("INFOHUB_AI_MODEL", cfg.AIModel)
@@ -193,8 +203,10 @@ func applyEnv(cfg Config) Config {
 
 type fileConfig struct {
 	RSS struct {
-		URL  string   `json:"url"`
-		URLs []string `json:"urls"`
+		URL               string   `json:"url"`
+		URLs              []string `json:"urls"`
+		MaxItemsPerFeed   int      `json:"max_items_per_feed"`
+		RecentWithinHours int      `json:"recent_within_hours"`
 	} `json:"rss"`
 	AI struct {
 		Endpoint string `json:"endpoint"`
@@ -236,6 +248,7 @@ func (f fileConfig) toConfig() Config {
 	cfg := Config{
 		RSSURL:          f.RSS.URL,
 		RSSURLs:         f.RSS.URLs,
+		RSSMaxItems:     f.RSS.MaxItemsPerFeed,
 		AIEndpoint:      f.AI.Endpoint,
 		AIAPIKey:        f.AI.APIKey,
 		AIModel:         f.AI.Model,
@@ -255,6 +268,9 @@ func (f fileConfig) toConfig() Config {
 
 	if f.Scheduler.IntervalSeconds > 0 {
 		cfg.ScheduleInterval = time.Duration(f.Scheduler.IntervalSeconds) * time.Second
+	}
+	if f.RSS.RecentWithinHours > 0 {
+		cfg.RSSRecentWithin = time.Duration(f.RSS.RecentWithinHours) * time.Hour
 	}
 
 	if len(cfg.RSSURLs) == 0 && cfg.RSSURL != "" {
@@ -276,6 +292,20 @@ func readDuration(name string, fallback time.Duration) time.Duration {
 	}
 
 	return time.Duration(seconds) * time.Second
+}
+
+func readHours(name string, fallback time.Duration) time.Duration {
+	value := os.Getenv(name)
+	if value == "" {
+		return fallback
+	}
+
+	hours, err := strconv.Atoi(value)
+	if err != nil || hours <= 0 {
+		return fallback
+	}
+
+	return time.Duration(hours) * time.Hour
 }
 
 func readString(name, fallback string) string {
