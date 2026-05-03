@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"InfoHub-agent/internal/model"
+	"InfoHub-agent/internal/processor"
 )
 
 // RSSCrawler 从 RSS 源采集真实信息。
@@ -49,11 +50,15 @@ func (c *RSSCrawler) Fetch() ([]model.NewsItem, error) {
 
 	items := make([]model.NewsItem, 0, len(feed.Channel.Items))
 	for index, item := range feed.Channel.Items {
+		title := processor.CleanText(item.Title, 200)
+		content := processor.CleanText(firstNonEmpty(item.Description, item.Title), 2000)
+		source := processor.CleanText(feed.Channel.Title, 100)
+
 		items = append(items, model.NewsItem{
 			ID:          int64(index + 1),
-			Title:       item.Title,
-			Content:     firstNonEmpty(item.Description, item.Title),
-			Source:      feed.Channel.Title,
+			Title:       title,
+			Content:     content,
+			Source:      source,
 			URL:         item.Link,
 			PublishTime: parseRSSDate(item.PubDate),
 		})
