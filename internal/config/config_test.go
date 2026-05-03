@@ -10,6 +10,8 @@ import (
 func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("INFOHUB_RSS_URL", "https://example.com/rss.xml")
 	t.Setenv("INFOHUB_RSS_URLS", "https://example.com/a.xml, https://example.com/b.xml")
+	t.Setenv("INFOHUB_RSS_MAX_ITEMS_PER_FEED", "20")
+	t.Setenv("INFOHUB_RSS_RECENT_WITHIN_HOURS", "72")
 	t.Setenv("INFOHUB_AI_ENDPOINT", "https://api.example.com/v1/chat/completions")
 	t.Setenv("INFOHUB_AI_API_KEY", "test-key")
 	t.Setenv("INFOHUB_AI_MODEL", "test-model")
@@ -30,55 +32,46 @@ func TestLoadFromEnv(t *testing.T) {
 	cfg := LoadFromEnv()
 
 	if !cfg.UseRSS() {
-		t.Fatal("期望启用 RSS 数据源")
+		t.Fatal("expected RSS to be enabled")
 	}
-
 	if len(cfg.RSSURLs) != 2 {
-		t.Fatalf("期望读取 2 个 RSS 数据源，实际为 %d", len(cfg.RSSURLs))
+		t.Fatalf("expected 2 RSS urls, got %d", len(cfg.RSSURLs))
 	}
-
+	if cfg.RSSMaxItems != 20 || cfg.RSSRecentWithin != 72*time.Hour {
+		t.Fatalf("unexpected RSS trimming config: %+v", cfg)
+	}
 	if !cfg.UseRealAI() {
-		t.Fatal("期望启用真实 AI 客户端")
+		t.Fatal("expected real AI client to be enabled")
 	}
-
 	if !cfg.UseWebhook() {
-		t.Fatal("期望启用 Webhook 推送")
+		t.Fatal("expected webhook to be enabled")
 	}
-
 	if cfg.ScheduleInterval != 120*time.Second {
-		t.Fatalf("期望调度间隔为 120 秒，实际为 %s", cfg.ScheduleInterval)
+		t.Fatalf("expected 120s schedule interval, got %s", cfg.ScheduleInterval)
 	}
-
 	if cfg.StorageDir != "tmp/reports" {
-		t.Fatalf("期望存储目录为 tmp/reports，实际为 %s", cfg.StorageDir)
+		t.Fatalf("expected storage dir tmp/reports, got %s", cfg.StorageDir)
 	}
-
 	if cfg.HTTPAddr != ":9090" {
-		t.Fatalf("期望 HTTP 地址为 :9090，实际为 %s", cfg.HTTPAddr)
+		t.Fatalf("expected http addr :9090, got %s", cfg.HTTPAddr)
 	}
-
 	if cfg.DedupStorePath != "tmp/dedup/seen.json" {
-		t.Fatalf("期望去重状态路径为 tmp/dedup/seen.json，实际为 %s", cfg.DedupStorePath)
+		t.Fatalf("expected dedup path tmp/dedup/seen.json, got %s", cfg.DedupStorePath)
 	}
-
 	if !cfg.SendEmptyReport {
-		t.Fatal("期望启用空日报推送")
+		t.Fatal("expected empty report sending to be enabled")
 	}
-
 	if cfg.AuthToken != "env-token" {
-		t.Fatalf("期望读取鉴权 token，实际为 %s", cfg.AuthToken)
+		t.Fatalf("expected auth token env-token, got %s", cfg.AuthToken)
 	}
-
 	if cfg.RedisAddr != "localhost:6379" || cfg.RedisPassword != "secret" || cfg.RedisDB != 2 || cfg.RedisDedupKey != "custom:dedup" {
-		t.Fatalf("Redis 配置不符合预期：%+v", cfg)
+		t.Fatalf("unexpected Redis config: %+v", cfg)
 	}
-
 	if !cfg.UseMySQL() {
-		t.Fatal("期望启用 MySQL 日报存储")
+		t.Fatal("expected MySQL storage to be enabled")
 	}
-
 	if cfg.MySQLDSN != "user:pass@tcp(localhost:3306)/infohub?parseTime=true" || cfg.MySQLTable != "daily_reports" {
-		t.Fatalf("MySQL 配置不符合预期：%+v", cfg)
+		t.Fatalf("unexpected MySQL config: %+v", cfg)
 	}
 }
 
@@ -88,7 +81,7 @@ func TestLoadFromEnvFallsBackToSingleRSSURL(t *testing.T) {
 	cfg := LoadFromEnv()
 
 	if len(cfg.RSSURLs) != 1 || cfg.RSSURLs[0] != "https://example.com/rss.xml" {
-		t.Fatalf("期望兼容单个 RSS URL，实际为 %+v", cfg.RSSURLs)
+		t.Fatalf("expected single RSS URL fallback, got %+v", cfg.RSSURLs)
 	}
 }
 
@@ -98,34 +91,29 @@ func TestLoadFromEnvUsesFallbackInterval(t *testing.T) {
 	cfg := LoadFromEnv()
 
 	if cfg.ScheduleInterval != defaultScheduleInterval {
-		t.Fatalf("期望使用默认调度间隔，实际为 %s", cfg.ScheduleInterval)
+		t.Fatalf("expected default interval, got %s", cfg.ScheduleInterval)
 	}
-
 	if cfg.StorageDir != defaultStorageDir {
-		t.Fatalf("期望使用默认存储目录，实际为 %s", cfg.StorageDir)
+		t.Fatalf("expected default storage dir, got %s", cfg.StorageDir)
 	}
-
 	if cfg.HTTPAddr != defaultHTTPAddr {
-		t.Fatalf("期望使用默认 HTTP 地址，实际为 %s", cfg.HTTPAddr)
+		t.Fatalf("expected default http addr, got %s", cfg.HTTPAddr)
 	}
-
 	if cfg.DedupStorePath != defaultDedupStorePath {
-		t.Fatalf("期望使用默认去重状态路径，实际为 %s", cfg.DedupStorePath)
+		t.Fatalf("expected default dedup path, got %s", cfg.DedupStorePath)
 	}
-
 	if cfg.MySQLTable != defaultMySQLTable {
-		t.Fatalf("期望使用默认 MySQL 表名，实际为 %s", cfg.MySQLTable)
+		t.Fatalf("expected default MySQL table, got %s", cfg.MySQLTable)
 	}
-
 	if cfg.SendEmptyReport {
-		t.Fatal("默认不应推送空日报")
+		t.Fatal("did not expect empty report sending by default")
 	}
 }
 
 func TestLoadFromJSONFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	content := `{
-  "rss": {"urls": ["https://example.com/a.xml", "https://example.com/b.xml"]},
+  "rss": {"urls": ["https://example.com/a.xml", "https://example.com/b.xml"], "max_items_per_feed": 10, "recent_within_hours": 48},
   "ai": {"endpoint": "https://api.example.com/v1/chat/completions", "api_key": "file-key", "model": "file-model"},
   "webhook": {"url": "https://example.com/webhook", "send_empty_report": true},
   "storage": {"dir": "file/reports"},
@@ -137,37 +125,35 @@ func TestLoadFromJSONFile(t *testing.T) {
   "scheduler": {"interval_seconds": 300}
 }`
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("写入测试配置失败：%v", err)
+		t.Fatalf("failed to write test config: %v", err)
 	}
 	t.Setenv("INFOHUB_CONFIG_PATH", path)
 
 	cfg, err := Load()
 	if err != nil {
-		t.Fatalf("读取 JSON 配置失败：%v", err)
+		t.Fatalf("failed to load config: %v", err)
 	}
 
 	if len(cfg.RSSURLs) != 2 {
-		t.Fatalf("期望读取 2 个 RSS 源，实际为 %d", len(cfg.RSSURLs))
+		t.Fatalf("expected 2 RSS urls, got %d", len(cfg.RSSURLs))
 	}
-
+	if cfg.RSSMaxItems != 10 || cfg.RSSRecentWithin != 48*time.Hour {
+		t.Fatalf("unexpected RSS trimming config: %+v", cfg)
+	}
 	if cfg.AIAPIKey != "file-key" {
-		t.Fatalf("期望读取文件中的 AI key，实际为 %s", cfg.AIAPIKey)
+		t.Fatalf("expected file AI key, got %s", cfg.AIAPIKey)
 	}
-
 	if cfg.ScheduleInterval != 300*time.Second {
-		t.Fatalf("期望调度间隔为 300 秒，实际为 %s", cfg.ScheduleInterval)
+		t.Fatalf("expected 300s interval, got %s", cfg.ScheduleInterval)
 	}
-
 	if cfg.AuthToken != "file-token" {
-		t.Fatalf("期望读取文件中的鉴权 token，实际为 %s", cfg.AuthToken)
+		t.Fatalf("expected file auth token, got %s", cfg.AuthToken)
 	}
-
 	if cfg.RedisAddr != "redis:6379" || cfg.RedisPassword != "file-secret" || cfg.RedisDB != 1 || cfg.RedisDedupKey != "file:dedup" {
-		t.Fatalf("期望读取文件中的 Redis 配置，实际为 %+v", cfg)
+		t.Fatalf("unexpected Redis config: %+v", cfg)
 	}
-
 	if cfg.MySQLDSN != "user:pass@tcp(mysql:3306)/infohub?parseTime=true" || cfg.MySQLTable != "report_records" {
-		t.Fatalf("期望读取文件中的 MySQL 配置，实际为 %+v", cfg)
+		t.Fatalf("unexpected MySQL config: %+v", cfg)
 	}
 }
 
@@ -180,7 +166,7 @@ func TestLoadEnvOverridesJSONFile(t *testing.T) {
   "mysql": {"dsn": "user:pass@tcp(mysql:3306)/infohub?parseTime=true", "table": "file_reports"}
 }`
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("写入测试配置失败：%v", err)
+		t.Fatalf("failed to write test config: %v", err)
 	}
 	t.Setenv("INFOHUB_CONFIG_PATH", path)
 	t.Setenv("INFOHUB_AI_MODEL", "env-model")
@@ -189,19 +175,17 @@ func TestLoadEnvOverridesJSONFile(t *testing.T) {
 
 	cfg, err := Load()
 	if err != nil {
-		t.Fatalf("读取配置失败：%v", err)
+		t.Fatalf("failed to load config: %v", err)
 	}
 
 	if cfg.AIModel != "env-model" {
-		t.Fatalf("期望环境变量覆盖 AI model，实际为 %s", cfg.AIModel)
+		t.Fatalf("expected env AI model, got %s", cfg.AIModel)
 	}
-
 	if cfg.HTTPAddr != ":9090" {
-		t.Fatalf("期望环境变量覆盖 HTTP 地址，实际为 %s", cfg.HTTPAddr)
+		t.Fatalf("expected env http addr, got %s", cfg.HTTPAddr)
 	}
-
 	if cfg.MySQLTable != "env_reports" {
-		t.Fatalf("期望环境变量覆盖 MySQL 表名，实际为 %s", cfg.MySQLTable)
+		t.Fatalf("expected env MySQL table, got %s", cfg.MySQLTable)
 	}
 }
 
@@ -209,16 +193,16 @@ func TestLoadJSONFileWithBOM(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	content := append([]byte{0xEF, 0xBB, 0xBF}, []byte(`{"http":{"addr":":6060"}}`)...)
 	if err := os.WriteFile(path, content, 0644); err != nil {
-		t.Fatalf("写入测试配置失败：%v", err)
+		t.Fatalf("failed to write test config: %v", err)
 	}
 	t.Setenv("INFOHUB_CONFIG_PATH", path)
 
 	cfg, err := Load()
 	if err != nil {
-		t.Fatalf("读取带 BOM 的 JSON 配置失败：%v", err)
+		t.Fatalf("failed to load BOM config: %v", err)
 	}
 
 	if cfg.HTTPAddr != ":6060" {
-		t.Fatalf("期望读取 HTTP 地址 :6060，实际为 %s", cfg.HTTPAddr)
+		t.Fatalf("expected http addr :6060, got %s", cfg.HTTPAddr)
 	}
 }

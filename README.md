@@ -90,6 +90,8 @@ Common environment variables:
 - `INFOHUB_CONFIG_PATH`
 - `INFOHUB_RSS_URL`
 - `INFOHUB_RSS_URLS`
+- `INFOHUB_RSS_MAX_ITEMS_PER_FEED`
+- `INFOHUB_RSS_RECENT_WITHIN_HOURS`
 - `INFOHUB_AI_ENDPOINT`
 - `INFOHUB_AI_API_KEY`
 - `INFOHUB_AI_MODEL`
@@ -222,6 +224,11 @@ The local RSS config currently uses these feeds:
 
 - [Google Blog RSS](https://blog.google/rss/)
 - [OpenAI News RSS](https://openai.com/news/rss.xml)
+
+The local RSS config also trims feed volume by default:
+
+- keep only items from the last `72` hours
+- keep at most `20` items per feed
 
 ## Current limitations
 

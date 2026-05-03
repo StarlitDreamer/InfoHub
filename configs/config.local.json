@@ -4,7 +4,9 @@
     "urls": [
       "https://blog.google/rss/",
       "https://openai.com/news/rss.xml"
-    ]
+    ],
+    "max_items_per_feed": 20,
+    "recent_within_hours": 72
   },
   "ai": {
     "endpoint": "",

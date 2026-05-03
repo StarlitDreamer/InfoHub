@@ -5,25 +5,37 @@ import (
 	"encoding/xml"
 	"fmt"
 	"net/http"
+	"sort"
 	"time"
 
 	"InfoHub-agent/internal/model"
 	"InfoHub-agent/internal/processor"
 )
 
+// RSSOptions 定义 RSS 采集过滤选项。
+type RSSOptions struct {
+	MaxItems     int
+	RecentWithin time.Duration
+	Now          func() time.Time
+}
+
 // RSSCrawler 从 RSS 源采集真实信息。
 type RSSCrawler struct {
-	url    string
-	client *http.Client
+	url     string
+	client  *http.Client
+	options RSSOptions
 }
 
 // NewRSSCrawler 创建 RSS 采集器。
-func NewRSSCrawler(url string, client *http.Client) *RSSCrawler {
+func NewRSSCrawler(url string, client *http.Client, options RSSOptions) *RSSCrawler {
 	if client == nil {
 		client = http.DefaultClient
 	}
+	if options.Now == nil {
+		options.Now = time.Now
+	}
 
-	return &RSSCrawler{url: url, client: client}
+	return &RSSCrawler{url: url, client: client, options: options}
 }
 
 // Fetch 拉取并解析 RSS 数据。
@@ -40,7 +52,7 @@ func (c *RSSCrawler) Fetch() ([]model.NewsItem, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("rss 请求失败，状态码：%d", resp.StatusCode)
+		return nil, fmt.Errorf("rss request failed, status code: %d", resp.StatusCode)
 	}
 
 	var feed rssFeed
@@ -53,6 +65,7 @@ func (c *RSSCrawler) Fetch() ([]model.NewsItem, error) {
 		title := processor.CleanText(item.Title, 200)
 		content := processor.CleanText(firstNonEmpty(item.Description, item.Title), 2000)
 		source := processor.CleanText(feed.Channel.Title, 100)
+		publishTime := parseRSSDate(item.PubDate, c.options.Now)
 
 		items = append(items, model.NewsItem{
 			ID:          int64(index + 1),
@@ -60,11 +73,11 @@ func (c *RSSCrawler) Fetch() ([]model.NewsItem, error) {
 			Content:     content,
 			Source:      source,
 			URL:         item.Link,
-			PublishTime: parseRSSDate(item.PubDate),
+			PublishTime: publishTime,
 		})
 	}
 
-	return items, nil
+	return c.filterItems(items), nil
 }
 
 type rssFeed struct {
@@ -83,6 +96,32 @@ type rssItem struct {
 	PubDate     string `xml:"pubDate"`
 }
 
+func (c *RSSCrawler) filterItems(items []model.NewsItem) []model.NewsItem {
+	filtered := items
+	if c.options.RecentWithin > 0 {
+		cutoff := c.options.Now().Add(-c.options.RecentWithin)
+		filtered = filtered[:0]
+		for _, item := range items {
+			if item.PublishTime.Before(cutoff) {
+				continue
+			}
+			filtered = append(filtered, item)
+		}
+	}
+
+	sort.SliceStable(filtered, func(i, j int) bool {
+		return filtered[i].PublishTime.After(filtered[j].PublishTime)
+	})
+
+	if c.options.MaxItems > 0 && len(filtered) > c.options.MaxItems {
+		filtered = filtered[:c.options.MaxItems]
+	}
+
+	result := make([]model.NewsItem, len(filtered))
+	copy(result, filtered)
+	return result
+}
+
 func firstNonEmpty(values ...string) string {
 	for _, value := range values {
 		if value != "" {
@@ -93,7 +132,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func parseRSSDate(value string) time.Time {
+func parseRSSDate(value string, now func() time.Time) time.Time {
 	for _, layout := range []string{time.RFC1123Z, time.RFC1123, time.RFC822Z, time.RFC822} {
 		parsed, err := time.Parse(layout, value)
 		if err == nil {
@@ -101,5 +140,5 @@ func parseRSSDate(value string) time.Time {
 		}
 	}
 
-	return time.Now()
+	return now()
 }
