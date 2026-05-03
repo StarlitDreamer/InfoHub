@@ -25,6 +25,7 @@ type Config struct {
 	StorageDir       string
 	HTTPAddr         string
 	DedupStorePath   string
+	SendEmptyReport  bool
 }
 
 // LoadFromEnv 从环境变量加载配置。
@@ -41,6 +42,7 @@ func LoadFromEnv() Config {
 		StorageDir:       readString("INFOHUB_STORAGE_DIR", defaultStorageDir),
 		HTTPAddr:         readString("INFOHUB_HTTP_ADDR", defaultHTTPAddr),
 		DedupStorePath:   readString("INFOHUB_DEDUP_STORE_PATH", defaultDedupStorePath),
+		SendEmptyReport:  readBool("INFOHUB_SEND_EMPTY_REPORT", false),
 	}
 }
 
@@ -89,6 +91,15 @@ func readList(name, fallback string) []string {
 	}
 
 	return splitList(fallback)
+}
+
+func readBool(name string, fallback bool) bool {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv(name)))
+	if value == "" {
+		return fallback
+	}
+
+	return value == "1" || value == "true" || value == "yes" || value == "on"
 }
 
 func splitList(value string) []string {

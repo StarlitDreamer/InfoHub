@@ -12,7 +12,12 @@ import (
 )
 
 // ReportRunner 表示可被 HTTP 触发的日报生成任务。
-type ReportRunner func(context.Context) error
+type ReportRunner func(context.Context) (ReportResult, error)
+
+// ReportResult 表示一次日报生成结果摘要。
+type ReportResult struct {
+	ItemCount int `json:"item_count"`
+}
 
 // NewRouter 创建 HTTP 路由。
 func NewRouter(repo repository.ReportRepository, runner ReportRunner) *gin.Engine {
@@ -25,12 +30,16 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner) *gin.Engin
 	})
 
 	router.POST("/reports/run", func(ctx *gin.Context) {
-		if err := runner(ctx.Request.Context()); err != nil {
+		result, err := runner(ctx.Request.Context())
+		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		ctx.JSON(http.StatusOK, gin.H{"status": "generated"})
+		ctx.JSON(http.StatusOK, gin.H{
+			"status":     "generated",
+			"item_count": result.ItemCount,
+		})
 	})
 
 	router.GET("/reports/latest", func(ctx *gin.Context) {

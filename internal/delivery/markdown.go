@@ -13,6 +13,11 @@ func RenderMarkdown(items []model.NewsItem) string {
 	var builder strings.Builder
 	builder.WriteString("# 今日信息\n\n")
 
+	if len(items) == 0 {
+		builder.WriteString("今日暂无新增信息。\n")
+		return builder.String()
+	}
+
 	for _, item := range items {
 		builder.WriteString(fmt.Sprintf("## %s\n", scoreStars(item.Score)))
 		builder.WriteString(fmt.Sprintf("- 标题：%s\n", item.Title))

@@ -36,7 +36,8 @@ func run(ctx context.Context, cfg config.Config, args []string) error {
 
 	switch mode {
 	case "run-once":
-		return runReport(ctx, cfg)
+		_, err := runReport(ctx, cfg)
+		return err
 	case "schedule":
 		return runSchedule(ctx, cfg)
 	case "serve":
@@ -46,7 +47,7 @@ func run(ctx context.Context, cfg config.Config, args []string) error {
 	}
 }
 
-func runReport(ctx context.Context, cfg config.Config) error {
+func runReport(ctx context.Context, cfg config.Config) (server.ReportResult, error) {
 	// 根据运行配置选择真实链路或本地演示链路。
 	pipeline := service.NewPipeline(
 		newCrawler(cfg),
@@ -54,7 +55,7 @@ func runReport(ctx context.Context, cfg config.Config) error {
 	).WithDedupStore(processor.NewFileDedupStore(cfg.DedupStorePath))
 	items, err := pipeline.RunContext(ctx)
 	if err != nil {
-		return err
+		return server.ReportResult{}, err
 	}
 
 	report := delivery.RenderMarkdown(items)
@@ -66,16 +67,16 @@ func runReport(ctx context.Context, cfg config.Config) error {
 		Markdown:    report,
 		Items:       items,
 	}); err != nil {
-		return err
+		return server.ReportResult{}, err
 	}
 
-	if cfg.UseWebhook() {
+	if cfg.UseWebhook() && (len(items) > 0 || cfg.SendEmptyReport) {
 		if err := delivery.NewWebhookSender(cfg.WebhookURL, nil).Send(report); err != nil {
-			return err
+			return server.ReportResult{}, err
 		}
 	}
 
-	return nil
+	return server.ReportResult{ItemCount: len(items)}, nil
 }
 
 func runSchedule(ctx context.Context, cfg config.Config) error {
@@ -83,7 +84,8 @@ func runSchedule(ctx context.Context, cfg config.Config) error {
 	defer stop()
 
 	job := func(context.Context) error {
-		return runReport(ctx, cfg)
+		_, err := runReport(ctx, cfg)
+		return err
 	}
 	task := scheduler.New(cfg.ScheduleInterval, job)
 
@@ -104,7 +106,7 @@ func runSchedule(ctx context.Context, cfg config.Config) error {
 
 func runServer(cfg config.Config) error {
 	repo := repository.NewFileReportRepository(cfg.StorageDir)
-	router := server.NewRouter(repo, func(ctx context.Context) error {
+	router := server.NewRouter(repo, func(ctx context.Context) (server.ReportResult, error) {
 		return runReport(ctx, cfg)
 	})
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,7 +13,9 @@ import (
 )
 
 func TestHealth(t *testing.T) {
-	router := NewRouter(newMemoryRepository(), func(context.Context) error { return nil })
+	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
+		return ReportResult{}, nil
+	})
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/health", nil)
 
@@ -25,9 +28,9 @@ func TestHealth(t *testing.T) {
 
 func TestRunReport(t *testing.T) {
 	called := false
-	router := NewRouter(newMemoryRepository(), func(context.Context) error {
+	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
 		called = true
-		return nil
+		return ReportResult{ItemCount: 3}, nil
 	})
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/reports/run", nil)
@@ -41,6 +44,10 @@ func TestRunReport(t *testing.T) {
 	if !called {
 		t.Fatal("期望日报生成任务被调用")
 	}
+
+	if !strings.Contains(recorder.Body.String(), `"item_count":3`) {
+		t.Fatalf("期望响应包含 item_count，实际为 %s", recorder.Body.String())
+	}
 }
 
 func TestLatestReport(t *testing.T) {
@@ -50,7 +57,9 @@ func TestLatestReport(t *testing.T) {
 		Markdown:    "# 今日信息",
 		Items:       []model.NewsItem{{Title: "测试"}},
 	})
-	router := NewRouter(repo, func(context.Context) error { return nil })
+	router := NewRouter(repo, func(context.Context) (ReportResult, error) {
+		return ReportResult{}, nil
+	})
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/reports/latest", nil)
 

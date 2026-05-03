@@ -16,6 +16,7 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("INFOHUB_STORAGE_DIR", "tmp/reports")
 	t.Setenv("INFOHUB_HTTP_ADDR", ":9090")
 	t.Setenv("INFOHUB_DEDUP_STORE_PATH", "tmp/dedup/seen.json")
+	t.Setenv("INFOHUB_SEND_EMPTY_REPORT", "true")
 
 	cfg := LoadFromEnv()
 
@@ -50,6 +51,10 @@ func TestLoadFromEnv(t *testing.T) {
 	if cfg.DedupStorePath != "tmp/dedup/seen.json" {
 		t.Fatalf("期望去重状态路径为 tmp/dedup/seen.json，实际为 %s", cfg.DedupStorePath)
 	}
+
+	if !cfg.SendEmptyReport {
+		t.Fatal("期望启用空日报推送")
+	}
 }
 
 func TestLoadFromEnvFallsBackToSingleRSSURL(t *testing.T) {
@@ -81,5 +86,9 @@ func TestLoadFromEnvUsesFallbackInterval(t *testing.T) {
 
 	if cfg.DedupStorePath != defaultDedupStorePath {
 		t.Fatalf("期望使用默认去重状态路径，实际为 %s", cfg.DedupStorePath)
+	}
+
+	if cfg.SendEmptyReport {
+		t.Fatal("默认不应推送空日报")
 	}
 }

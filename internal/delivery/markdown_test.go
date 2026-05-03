@@ -20,3 +20,11 @@ func TestRenderMarkdownIncludesTitleAndSummary(t *testing.T) {
 		t.Fatal("期望 Markdown 包含信息标题")
 	}
 }
+
+func TestRenderMarkdownEmptyItems(t *testing.T) {
+	report := RenderMarkdown(nil)
+
+	if !strings.Contains(report, "今日暂无新增信息。") {
+		t.Fatal("期望空日报包含无新增信息提示")
+	}
+}
