@@ -46,12 +46,14 @@ type Config struct {
 
 // SourceConfig 定义一个可执行的数据源配置。
 type SourceConfig struct {
-	Enabled        bool
-	Name           string
-	Kind           string
-	Location       string
-	TimeoutSeconds int
-	Headers        map[string]string
+	Enabled         bool
+	Name            string
+	Kind            string
+	Location        string
+	Priority        int
+	IncludeInReport bool
+	TimeoutSeconds  int
+	Headers         map[string]string
 }
 
 // Load 先读取 JSON 配置文件，再使用环境变量覆盖。
@@ -99,20 +101,22 @@ func (c Config) SourcesOrDefault() []SourceConfig {
 		result := make([]SourceConfig, 0, len(c.RSSURLs))
 		for _, url := range c.RSSURLs {
 			result = append(result, SourceConfig{
-				Enabled:  true,
-				Name:     url,
-				Kind:     "rss",
-				Location: url,
+				Enabled:         true,
+				Name:            url,
+				Kind:            "rss",
+				Location:        url,
+				IncludeInReport: true,
 			})
 		}
 		return result
 	}
 
 	return []SourceConfig{{
-		Enabled:  true,
-		Name:     "demo",
-		Kind:     "demo",
-		Location: "in-memory",
+		Enabled:         true,
+		Name:            "demo",
+		Kind:            "demo",
+		Location:        "in-memory",
+		IncludeInReport: true,
 	}}
 }
 
@@ -309,12 +313,14 @@ type fileConfig struct {
 }
 
 type sourceFileConfig struct {
-	Enabled        *bool             `json:"enabled"`
-	Name           string            `json:"name"`
-	Kind           string            `json:"kind"`
-	Location       string            `json:"location"`
-	TimeoutSeconds int               `json:"timeout_seconds"`
-	Headers        map[string]string `json:"headers"`
+	Enabled         *bool             `json:"enabled"`
+	Name            string            `json:"name"`
+	Kind            string            `json:"kind"`
+	Location        string            `json:"location"`
+	Priority        int               `json:"priority"`
+	IncludeInReport *bool             `json:"include_in_report"`
+	TimeoutSeconds  int               `json:"timeout_seconds"`
+	Headers         map[string]string `json:"headers"`
 }
 
 func (f fileConfig) toConfig() Config {
@@ -346,13 +352,19 @@ func (f fileConfig) toConfig() Config {
 		if source.Enabled != nil {
 			enabled = *source.Enabled
 		}
+		includeInReport := true
+		if source.IncludeInReport != nil {
+			includeInReport = *source.IncludeInReport
+		}
 		cfg.Sources = append(cfg.Sources, SourceConfig{
-			Enabled:        enabled,
-			Name:           source.Name,
-			Kind:           source.Kind,
-			Location:       source.Location,
-			TimeoutSeconds: source.TimeoutSeconds,
-			Headers:        cloneStringMap(source.Headers),
+			Enabled:         enabled,
+			Name:            source.Name,
+			Kind:            source.Kind,
+			Location:        source.Location,
+			Priority:        source.Priority,
+			IncludeInReport: includeInReport,
+			TimeoutSeconds:  source.TimeoutSeconds,
+			Headers:         cloneStringMap(source.Headers),
 		})
 	}
 

@@ -6,6 +6,7 @@ import "time"
 // NewsItem 表示从数据源采集并经过处理的一条信息。
 type NewsItem struct {
 	ID          int64
+	SourceName  string
 	Title       string
 	Content     string
 	Source      string

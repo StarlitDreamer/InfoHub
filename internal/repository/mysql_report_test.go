@@ -50,13 +50,13 @@ func TestMySQLReportRepositorySave(t *testing.T) {
 
 	generatedAt := time.Date(2026, 5, 3, 16, 0, 0, 0, time.FixedZone("CST", 8*3600))
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO `reports` (generated_at, markdown, items_json) VALUES (?, ?, ?)")).
-		WithArgs(generatedAt.UTC(), "# 今日信息", `[{"ID":0,"Title":"测试标题","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0}]`).
+		WithArgs(generatedAt.UTC(), "# report", `[{"ID":0,"SourceName":"","Title":"test title","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0}]`).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	err = repo.Save(context.Background(), ReportRecord{
 		GeneratedAt: generatedAt,
-		Markdown:    "# 今日信息",
-		Items:       []model.NewsItem{{Title: "测试标题"}},
+		Markdown:    "# report",
+		Items:       []model.NewsItem{{Title: "test title"}},
 	})
 	if err != nil {
 		t.Fatalf("save failed: %v", err)
@@ -84,20 +84,20 @@ func TestMySQLReportRepositoryLatestAndList(t *testing.T) {
 	latestTime := time.Date(2026, 5, 3, 16, 30, 0, 0, time.UTC)
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT generated_at, markdown, items_json FROM `reports` ORDER BY generated_at DESC, id DESC LIMIT 1")).
 		WillReturnRows(sqlmock.NewRows([]string{"generated_at", "markdown", "items_json"}).
-			AddRow(latestTime, "# 今日信息\n\n## ⭐⭐⭐\n- 标题：第二条\n- 摘要：摘要二\n", `[{"ID":0,"Title":"第二条","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0}]`))
+			AddRow(latestTime, "# report\n\n## item\n- summary\n", `[{"ID":0,"SourceName":"","Title":"second","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0}]`))
 
 	record, err := repo.Latest(context.Background())
 	if err != nil {
 		t.Fatalf("latest failed: %v", err)
 	}
-	if record.Markdown == "" || len(record.Items) != 1 || record.Items[0].Title != "第二条" {
+	if record.Markdown == "" || len(record.Items) != 1 || record.Items[0].Title != "second" {
 		t.Fatalf("unexpected latest record: %+v", record)
 	}
 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT generated_at, markdown, items_json FROM `reports` ORDER BY generated_at DESC, id DESC")).
 		WillReturnRows(sqlmock.NewRows([]string{"generated_at", "markdown", "items_json"}).
-			AddRow(latestTime, "# 今日信息\n\n## ⭐⭐⭐\n- 标题：第二条\n- 摘要：摘要二\n\n## ⭐⭐\n- 标题：第三条\n- 摘要：摘要三\n", `[{"ID":0,"Title":"第二条","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0},{"ID":0,"Title":"第三条","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0},{"ID":0,"Title":"库存但未展示","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0}]`).
-			AddRow(time.Date(2026, 5, 3, 15, 30, 0, 0, time.UTC), "# 今日信息\n\n## ⭐⭐⭐\n- 标题：第一条\n- 摘要：摘要一\n", `[{"ID":0,"Title":"第一条","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0}]`))
+			AddRow(latestTime, "# report\n\n## item one\n- summary\n\n## item two\n- summary\n", `[{"ID":0,"SourceName":"","Title":"second","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0},{"ID":0,"SourceName":"","Title":"third","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0},{"ID":0,"SourceName":"","Title":"stored only","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0}]`).
+			AddRow(time.Date(2026, 5, 3, 15, 30, 0, 0, time.UTC), "# report\n\n## older item\n- summary\n", `[{"ID":0,"SourceName":"","Title":"first","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0}]`))
 
 	records, err := repo.List(context.Background())
 	if err != nil {

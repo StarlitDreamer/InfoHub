@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"InfoHub-agent/internal/config"
+	"InfoHub-agent/internal/model"
 )
 
 func TestBuildFromSourcesReturnsSingleRSSCrawler(t *testing.T) {
@@ -27,9 +28,13 @@ func TestBuildFromSourcesReturnsSingleRSSCrawler(t *testing.T) {
 		t.Fatalf("build crawler failed: %v", err)
 	}
 
-	rssCrawler, ok := crawler.(*RSSCrawler)
+	wrapped, ok := crawler.(sourceCrawler)
 	if !ok {
-		t.Fatalf("expected rss crawler, got %T", crawler)
+		t.Fatalf("expected wrapped crawler, got %T", crawler)
+	}
+	rssCrawler, ok := wrapped.crawler.(*RSSCrawler)
+	if !ok {
+		t.Fatalf("expected rss crawler inside wrapper, got %T", wrapped.crawler)
 	}
 	if rssCrawler.url != "https://example.com/a.xml" {
 		t.Fatalf("expected rss location to be preserved, got %s", rssCrawler.url)
@@ -50,9 +55,13 @@ func TestBuildFromSourcesReturnsSingleHTTPJSONCrawler(t *testing.T) {
 		t.Fatalf("build crawler failed: %v", err)
 	}
 
-	httpJSONCrawler, ok := crawler.(*HTTPJSONCrawler)
+	wrapped, ok := crawler.(sourceCrawler)
 	if !ok {
-		t.Fatalf("expected http json crawler, got %T", crawler)
+		t.Fatalf("expected wrapped crawler, got %T", crawler)
+	}
+	httpJSONCrawler, ok := wrapped.crawler.(*HTTPJSONCrawler)
+	if !ok {
+		t.Fatalf("expected http json crawler inside wrapper, got %T", wrapped.crawler)
 	}
 	if httpJSONCrawler.url != "https://example.com/api.json" {
 		t.Fatalf("expected http json location to be preserved, got %s", httpJSONCrawler.url)
@@ -98,6 +107,24 @@ func TestBuildFromSourcesSkipsDisabledSources(t *testing.T) {
 
 	if _, ok := crawler.(*DemoCrawler); !ok {
 		t.Fatalf("expected demo fallback when all sources disabled, got %T", crawler)
+	}
+}
+
+func TestWrapSourceCrawlerSetsSourceName(t *testing.T) {
+	wrapped := wrapSourceCrawler(config.SourceConfig{
+		Name:    "feed-a",
+		Kind:    "demo",
+		Enabled: true,
+	}, staticCrawler{
+		items: []model.NewsItem{{Title: "item"}},
+	})
+
+	items, err := wrapped.Fetch()
+	if err != nil {
+		t.Fatalf("wrapped fetch failed: %v", err)
+	}
+	if len(items) != 1 || items[0].SourceName != "feed-a" {
+		t.Fatalf("expected source name to be stamped, got %+v", items)
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"InfoHub-agent/internal/config"
+	"InfoHub-agent/internal/model"
 )
 
 // FactoryOptions 保存构建采集器时共享的选项。
@@ -28,7 +29,7 @@ func BuildFromSources(sources []config.SourceConfig, options FactoryOptions) (Cr
 			continue
 		}
 
-		crawlers = append(crawlers, crawler)
+		crawlers = append(crawlers, wrapSourceCrawler(source, crawler))
 	}
 
 	if len(crawlers) == 0 {
@@ -39,6 +40,41 @@ func BuildFromSources(sources []config.SourceConfig, options FactoryOptions) (Cr
 	}
 
 	return NewMultiCrawler(crawlers), nil
+}
+
+type sourceCrawler struct {
+	source  config.SourceConfig
+	crawler Crawler
+}
+
+func wrapSourceCrawler(source config.SourceConfig, crawler Crawler) Crawler {
+	return sourceCrawler{
+		source:  source,
+		crawler: crawler,
+	}
+}
+
+func (c sourceCrawler) Fetch() ([]model.NewsItem, error) {
+	items, err := c.crawler.Fetch()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]model.NewsItem, len(items))
+	for index, item := range items {
+		item.SourceName = c.source.Name
+		result[index] = item
+	}
+
+	return result, nil
+}
+
+func (c sourceCrawler) String() string {
+	if named, ok := c.crawler.(interface{ String() string }); ok {
+		return named.String()
+	}
+
+	return c.source.Name
 }
 
 func buildSingleSource(source config.SourceConfig, options FactoryOptions) (Crawler, error) {

@@ -145,6 +145,47 @@ func TestAgentRunCanGroupMarkdownBySource(t *testing.T) {
 	}
 }
 
+func TestAgentRunAppliesSourcePriorityAndReportFilter(t *testing.T) {
+	fixedNow := time.Date(2026, 5, 3, 20, 0, 0, 0, time.UTC)
+	repo := &agentRepositoryStub{}
+	agent := NewAgent(
+		staticPipelineRunner{
+			items: []model.NewsItem{
+				{SourceName: "normal", Title: "normal item", Content: "summary a", Source: "OpenAI News", Score: 5, PublishTime: fixedNow.Add(-1 * time.Hour)},
+				{SourceName: "priority", Title: "priority item", Content: "summary b", Source: "Google Blog", Score: 1, PublishTime: fixedNow.Add(-2 * time.Hour)},
+				{SourceName: "hidden", Title: "hidden item", Content: "summary c", Source: "Internal Feed", Score: 5, PublishTime: fixedNow.Add(-30 * time.Minute)},
+			},
+		},
+		repo,
+		AgentOptions{
+			Now: func() time.Time { return fixedNow },
+		},
+	)
+
+	result, err := agent.RunWithRequest(context.Background(), AgentRequest{
+		Context: ExecutionContext{
+			Sources: []Source{
+				{Name: "normal", IncludeInReport: true},
+				{Name: "priority", Priority: 10, IncludeInReport: true},
+				{Name: "hidden", IncludeInReport: false},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("agent run failed: %v", err)
+	}
+
+	if len(result.Items) != 3 || result.Items[0].SourceName != "priority" {
+		t.Fatalf("expected priority source to sort first, got %+v", result.Items)
+	}
+	if strings.Contains(result.Markdown, "hidden item") {
+		t.Fatalf("expected hidden source to be excluded from report, got %s", result.Markdown)
+	}
+	if result.DisplayCount != 2 {
+		t.Fatalf("expected display count 2 after source filter, got %d", result.DisplayCount)
+	}
+}
+
 func TestAgentRunSkipsEmptyWebhookByDefault(t *testing.T) {
 	agent := NewAgent(
 		staticPipelineRunner{},

@@ -161,9 +161,11 @@ func buildAgentRequest(cfg config.Config, trigger string) service.AgentRequest {
 	sources := make([]service.Source, 0, len(configuredSources))
 	for _, source := range configuredSources {
 		sources = append(sources, service.Source{
-			Name:     source.Name,
-			Kind:     source.Kind,
-			Location: source.Location,
+			Name:            source.Name,
+			Kind:            source.Kind,
+			Location:        source.Location,
+			Priority:        source.Priority,
+			IncludeInReport: source.IncludeInReport,
 		})
 	}
 

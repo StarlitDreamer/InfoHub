@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"InfoHub-agent/internal/delivery"
@@ -42,9 +43,11 @@ type Result struct {
 
 // Source 定义 Agent 本次执行使用的数据源。
 type Source struct {
-	Name     string
-	Kind     string
-	Location string
+	Name            string
+	Kind            string
+	Location        string
+	Priority        int
+	IncludeInReport bool
 }
 
 // ExecutionContext 描述一次 Agent 执行上下文。
@@ -99,7 +102,8 @@ func (a *Agent) RunWithRequest(ctx context.Context, request AgentRequest) (Resul
 	}
 
 	sortedItems := SortByDecisionScore(items, a.now())
-	displayItems := LimitItems(sortedItems, a.reportMaxItems)
+	sortedItems = applySourcePriority(sortedItems, request)
+	displayItems := LimitItems(filterReportItems(sortedItems, request), a.reportMaxItems)
 	report := delivery.RenderMarkdown(displayItems)
 	if a.groupBySource {
 		report = delivery.RenderMarkdownBySource(displayItems)
@@ -143,4 +147,37 @@ func normalizeAgentRequest(request AgentRequest, requestedAt time.Time) AgentReq
 	}
 
 	return request
+}
+
+func applySourcePriority(items []model.NewsItem, request AgentRequest) []model.NewsItem {
+	priorities := make(map[string]int, len(request.Context.Sources))
+	for _, source := range request.Context.Sources {
+		priorities[source.Name] = source.Priority
+	}
+
+	result := append([]model.NewsItem(nil), items...)
+	sort.SliceStable(result, func(i, j int) bool {
+		left := priorities[result[i].SourceName]
+		right := priorities[result[j].SourceName]
+		return left > right
+	})
+
+	return result
+}
+
+func filterReportItems(items []model.NewsItem, request AgentRequest) []model.NewsItem {
+	include := make(map[string]bool, len(request.Context.Sources))
+	for _, source := range request.Context.Sources {
+		include[source.Name] = source.IncludeInReport
+	}
+
+	result := make([]model.NewsItem, 0, len(items))
+	for _, item := range items {
+		if allowed, ok := include[item.SourceName]; ok && !allowed {
+			continue
+		}
+		result = append(result, item)
+	}
+
+	return result
 }

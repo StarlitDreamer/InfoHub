@@ -190,7 +190,7 @@ func TestBuildAgentRequestFallsBackToDemoSource(t *testing.T) {
 func TestBuildAgentRequestPrefersExplicitSources(t *testing.T) {
 	request := buildAgentRequest(config.Config{
 		Sources: []config.SourceConfig{
-			{Name: "custom-demo", Kind: "demo", Location: "memory://custom"},
+			{Name: "custom-demo", Kind: "demo", Location: "memory://custom", Priority: 9, IncludeInReport: false},
 		},
 		RSSURLs: []string{"https://example.com/a.xml"},
 	}, "manual")
@@ -201,6 +201,9 @@ func TestBuildAgentRequestPrefersExplicitSources(t *testing.T) {
 	if request.Context.Sources[0].Name != "custom-demo" || request.Context.Sources[0].Location != "memory://custom" {
 		t.Fatalf("expected explicit source to be used, got %+v", request.Context.Sources[0])
 	}
+	if request.Context.Sources[0].Priority != 9 || request.Context.Sources[0].IncludeInReport {
+		t.Fatalf("expected source strategy fields to be carried, got %+v", request.Context.Sources[0])
+	}
 }
 
 func TestNewCrawlerFallsBackToDemoWhenSourceBuildFails(t *testing.T) {
@@ -210,8 +213,16 @@ func TestNewCrawlerFallsBackToDemoWhenSourceBuildFails(t *testing.T) {
 		},
 	})
 
-	if _, ok := built.(*crawler.DemoCrawler); !ok {
-		t.Fatalf("expected demo fallback crawler, got %T", built)
+	wrapped, ok := built.(crawler.Crawler)
+	if !ok {
+		t.Fatalf("expected crawler, got %T", built)
+	}
+	items, err := wrapped.Fetch()
+	if err != nil {
+		t.Fatalf("expected demo fallback fetch to succeed, got %v", err)
+	}
+	if len(items) == 0 || items[0].SourceName != "demo" {
+		t.Fatalf("expected demo fallback items, got %+v", items)
 	}
 }
 
