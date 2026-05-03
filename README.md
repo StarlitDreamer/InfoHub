@@ -47,6 +47,12 @@ Run the MySQL integration test against the local Compose database:
 INFOHUB_TEST_MYSQL_DSN="infohub:infohub@tcp(localhost:3307)/infohub?charset=utf8mb4&parseTime=true&loc=Local" go test ./internal/repository -run TestMySQLReportRepositoryIntegration
 ```
 
+Run the Redis integration test against the local Compose cache:
+
+```bash
+INFOHUB_TEST_REDIS_ADDR="localhost:6379" go test ./internal/processor -run TestRedisDedupStoreIntegration
+```
+
 Generate one report:
 
 ```bash
