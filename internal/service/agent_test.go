@@ -49,7 +49,7 @@ func TestAgentRunStoresSortedItemsAndTrimmedMarkdown(t *testing.T) {
 	if repo.record.Items[0].Title != "beta" || repo.record.Items[1].Title != "gamma" {
 		t.Fatalf("unexpected sorted order: %+v", repo.record.Items)
 	}
-	if strings.Count(repo.record.Markdown, "## ") != 2 {
+	if strings.Count(repo.record.Markdown, "## ⭐") != 2 {
 		t.Fatalf("expected markdown to contain 2 sections, got %s", repo.record.Markdown)
 	}
 	if strings.Contains(repo.record.Markdown, "alpha") {

@@ -8,7 +8,7 @@ import (
 	"InfoHub-agent/internal/model"
 )
 
-func TestRenderMarkdownIncludesDecisionFields(t *testing.T) {
+func TestRenderMarkdownIncludesOverviewAndDecisionFields(t *testing.T) {
 	report := RenderMarkdown([]model.NewsItem{
 		{
 			Title:       "test title",
@@ -23,6 +23,12 @@ func TestRenderMarkdownIncludesDecisionFields(t *testing.T) {
 
 	if !strings.Contains(report, "# 今日信息") {
 		t.Fatal("expected markdown to include report heading")
+	}
+	if !strings.Contains(report, "## 今日概览") {
+		t.Fatal("expected markdown to include overview section")
+	}
+	if !strings.Contains(report, "- 收录条目：1") {
+		t.Fatal("expected markdown to include item count")
 	}
 	if !strings.Contains(report, "## ⭐⭐⭐⭐ test title") {
 		t.Fatal("expected markdown to include scored item heading")
@@ -71,10 +77,29 @@ func TestRenderMarkdownFallsBackForPlainSummary(t *testing.T) {
 	}
 }
 
+func TestRenderMarkdownOverviewSummarizesSourcesAndTopItems(t *testing.T) {
+	report := RenderMarkdown([]model.NewsItem{
+		{Title: "alpha", Content: "a", Source: "OpenAI News", Score: 5},
+		{Title: "beta", Content: "b", Source: "Google Blog", Score: 4},
+		{Title: "gamma", Content: "c", Source: "OpenAI News", Score: 2},
+		{Title: "delta", Content: "d", Source: "", Score: 1},
+	})
+
+	if !strings.Contains(report, "- 高优先级：2") {
+		t.Fatalf("expected high priority count, got %s", report)
+	}
+	if !strings.Contains(report, "- 来源分布：Google Blog 1；OpenAI News 2；未知来源 1") {
+		t.Fatalf("expected source distribution, got %s", report)
+	}
+	if !strings.Contains(report, "- 重点关注：alpha；beta；gamma") {
+		t.Fatalf("expected top item summary, got %s", report)
+	}
+}
+
 func countMarkdownItemHeadings(report string) int {
 	count := 0
 	for _, line := range strings.Split(report, "\n") {
-		if strings.HasPrefix(line, "## ") && !strings.HasPrefix(line, "### ") {
+		if strings.HasPrefix(line, "## ⭐") {
 			count++
 		}
 	}

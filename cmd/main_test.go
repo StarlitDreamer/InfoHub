@@ -108,7 +108,7 @@ func TestRunReportWithRepositorySavesSortedItemsAndTrimmedMarkdown(t *testing.T)
 		}
 	}
 
-	if strings.Count(repo.record.Markdown, "## ") != 2 {
+	if strings.Count(repo.record.Markdown, "## ⭐") != 2 {
 		t.Fatalf("expected markdown to render 2 sections, got %s", repo.record.Markdown)
 	}
 	if !strings.Contains(repo.record.Markdown, expectedOrder[0]) || !strings.Contains(repo.record.Markdown, expectedOrder[1]) {

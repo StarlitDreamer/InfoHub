@@ -28,6 +28,8 @@ func renderMarkdown(items []model.NewsItem, groupBySource bool) string {
 		return builder.String()
 	}
 
+	renderOverview(&builder, items)
+
 	if groupBySource {
 		renderGroupedItems(&builder, items)
 		return builder.String()
@@ -40,15 +42,20 @@ func renderMarkdown(items []model.NewsItem, groupBySource bool) string {
 	return builder.String()
 }
 
+func renderOverview(builder *strings.Builder, items []model.NewsItem) {
+	builder.WriteString("## 今日概览\n")
+	builder.WriteString(fmt.Sprintf("- 收录条目：%d\n", len(items)))
+	builder.WriteString(fmt.Sprintf("- 高优先级：%d\n", countHighPriority(items)))
+	builder.WriteString(fmt.Sprintf("- 来源分布：%s\n", summarizeSources(items)))
+	builder.WriteString(fmt.Sprintf("- 重点关注：%s\n\n", summarizeTopTitles(items, 3)))
+}
+
 func renderGroupedItems(builder *strings.Builder, items []model.NewsItem) {
 	grouped := make(map[string][]model.NewsItem)
 	order := make([]string, 0)
 
 	for _, item := range items {
-		source := strings.TrimSpace(item.Source)
-		if source == "" {
-			source = "未知来源"
-		}
+		source := normalizeSource(item.Source)
 		if _, ok := grouped[source]; !ok {
 			order = append(order, source)
 		}
@@ -69,9 +76,7 @@ func renderItem(builder *strings.Builder, item model.NewsItem) {
 
 	builder.WriteString(fmt.Sprintf("## %s %s\n", scoreStars(item.Score), summary.Title))
 	builder.WriteString(fmt.Sprintf("- 标题：%s\n", summary.Title))
-	if item.Source != "" {
-		builder.WriteString(fmt.Sprintf("- 来源：%s\n", item.Source))
-	}
+	builder.WriteString(fmt.Sprintf("- 来源：%s\n", normalizeSource(item.Source)))
 	if !item.PublishTime.IsZero() {
 		builder.WriteString(fmt.Sprintf("- 时间：%s\n", item.PublishTime.Format("2006-01-02 15:04")))
 	}
@@ -103,8 +108,7 @@ func parseStructuredSummary(item model.NewsItem) structuredSummary {
 		Impact:       "建议评估是否需要跟进、验证或纳入后续决策。",
 	}
 
-	lines := strings.Split(item.Content, "\n")
-	for _, rawLine := range lines {
+	for _, rawLine := range strings.Split(item.Content, "\n") {
 		line := strings.TrimSpace(rawLine)
 		switch {
 		case strings.HasPrefix(line, "【标题】"):
@@ -128,6 +132,71 @@ func parseStructuredSummary(item model.NewsItem) structuredSummary {
 	return summary
 }
 
+func countHighPriority(items []model.NewsItem) int {
+	count := 0
+	for _, item := range items {
+		if clampScore(item.Score) >= 4 {
+			count++
+		}
+	}
+
+	return count
+}
+
+func summarizeSources(items []model.NewsItem) string {
+	counts := map[string]int{}
+	order := make([]string, 0)
+
+	for _, item := range items {
+		source := normalizeSource(item.Source)
+		if _, ok := counts[source]; !ok {
+			order = append(order, source)
+		}
+		counts[source]++
+	}
+
+	sort.Strings(order)
+	parts := make([]string, 0, len(order))
+	for _, source := range order {
+		parts = append(parts, fmt.Sprintf("%s %d", source, counts[source]))
+	}
+
+	return strings.Join(parts, "；")
+}
+
+func summarizeTopTitles(items []model.NewsItem, limit int) string {
+	if limit <= 0 {
+		limit = 1
+	}
+
+	parts := make([]string, 0, limit)
+	for _, item := range items {
+		title := strings.TrimSpace(item.Title)
+		if title == "" {
+			continue
+		}
+		parts = append(parts, title)
+		if len(parts) == limit {
+			break
+		}
+	}
+
+	if len(parts) == 0 {
+		return "暂无"
+	}
+
+	return strings.Join(parts, "；")
+}
+
+func normalizeSource(source string) string {
+	source = strings.TrimSpace(source)
+	if source == "" {
+		return "未知来源"
+	}
+
+	return source
+}
+
 // scoreStars 将 1-5 分评分转换为星级展示。
 func scoreStars(score float64) string {
 	count := int(clampScore(score))
@@ -141,5 +210,6 @@ func clampScore(score float64) float64 {
 	if score > 5 {
 		return 5
 	}
+
 	return score
 }
