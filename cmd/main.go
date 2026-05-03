@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -19,6 +20,8 @@ import (
 	"InfoHub-agent/internal/scheduler"
 	"InfoHub-agent/internal/server"
 	"InfoHub-agent/internal/service"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 func main() {
@@ -47,12 +50,21 @@ func run(ctx context.Context, cfg config.Config, args []string) error {
 	case "serve":
 		return runServer(cfg)
 	default:
-		return fmt.Errorf("未知运行模式：%s，可用模式：run-once、schedule、serve", mode)
+		return fmt.Errorf("unknown mode: %s", mode)
 	}
 }
 
 func runReport(ctx context.Context, cfg config.Config) (server.ReportResult, error) {
-	// 根据运行配置选择真实链路或本地演示链路。
+	repo, closeRepo, err := newReportRepository(cfg)
+	if err != nil {
+		return server.ReportResult{}, err
+	}
+	defer closeRepo()
+
+	return runReportWithRepository(ctx, cfg, repo)
+}
+
+func runReportWithRepository(ctx context.Context, cfg config.Config, repo repository.ReportRepository) (server.ReportResult, error) {
 	pipeline := service.NewPipeline(
 		newCrawler(cfg),
 		newAIProcessor(cfg),
@@ -65,7 +77,6 @@ func runReport(ctx context.Context, cfg config.Config) (server.ReportResult, err
 	report := delivery.RenderMarkdown(items)
 	fmt.Print(report)
 
-	repo := repository.NewFileReportRepository(cfg.StorageDir)
 	if err := repo.Save(ctx, repository.ReportRecord{
 		GeneratedAt: timeNow(),
 		Markdown:    report,
@@ -98,7 +109,7 @@ func runSchedule(ctx context.Context, cfg config.Config) error {
 	}
 
 	task.Start(ctx, func(err error) {
-		log.Printf("定时任务执行失败：%v", err)
+		log.Printf("schedule run failed: %v", err)
 	})
 
 	if err := ctx.Err(); err != nil && !errors.Is(err, context.Canceled) {
@@ -109,9 +120,14 @@ func runSchedule(ctx context.Context, cfg config.Config) error {
 }
 
 func runServer(cfg config.Config) error {
-	repo := repository.NewFileReportRepository(cfg.StorageDir)
+	repo, closeRepo, err := newReportRepository(cfg)
+	if err != nil {
+		return err
+	}
+	defer closeRepo()
+
 	router := server.NewRouter(repo, func(ctx context.Context) (server.ReportResult, error) {
-		return runReport(ctx, cfg)
+		return runReportWithRepository(ctx, cfg, repo)
 	}, server.Options{AuthToken: cfg.AuthToken})
 
 	return router.Run(cfg.HTTPAddr)
@@ -153,4 +169,24 @@ func newDedupStore(cfg config.Config) processor.DedupStore {
 	}
 
 	return processor.NewFileDedupStore(cfg.DedupStorePath)
+}
+
+func newReportRepository(cfg config.Config) (repository.ReportRepository, func() error, error) {
+	if cfg.UseMySQL() {
+		db, err := sql.Open("mysql", cfg.MySQLDSN)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		repo, err := repository.NewMySQLReportRepository(db, cfg.MySQLTable)
+		if err != nil {
+			_ = db.Close()
+			return nil, nil, err
+		}
+
+		return repo, repo.Close, nil
+	}
+
+	repo := repository.NewFileReportRepository(cfg.StorageDir)
+	return repo, func() error { return nil }, nil
 }

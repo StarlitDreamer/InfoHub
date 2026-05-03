@@ -24,6 +24,8 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("INFOHUB_REDIS_PASSWORD", "secret")
 	t.Setenv("INFOHUB_REDIS_DB", "2")
 	t.Setenv("INFOHUB_REDIS_DEDUP_KEY", "custom:dedup")
+	t.Setenv("INFOHUB_MYSQL_DSN", "user:pass@tcp(localhost:3306)/infohub?parseTime=true")
+	t.Setenv("INFOHUB_MYSQL_TABLE", "daily_reports")
 
 	cfg := LoadFromEnv()
 
@@ -70,6 +72,14 @@ func TestLoadFromEnv(t *testing.T) {
 	if cfg.RedisAddr != "localhost:6379" || cfg.RedisPassword != "secret" || cfg.RedisDB != 2 || cfg.RedisDedupKey != "custom:dedup" {
 		t.Fatalf("Redis 配置不符合预期：%+v", cfg)
 	}
+
+	if !cfg.UseMySQL() {
+		t.Fatal("期望启用 MySQL 日报存储")
+	}
+
+	if cfg.MySQLDSN != "user:pass@tcp(localhost:3306)/infohub?parseTime=true" || cfg.MySQLTable != "daily_reports" {
+		t.Fatalf("MySQL 配置不符合预期：%+v", cfg)
+	}
 }
 
 func TestLoadFromEnvFallsBackToSingleRSSURL(t *testing.T) {
@@ -103,6 +113,10 @@ func TestLoadFromEnvUsesFallbackInterval(t *testing.T) {
 		t.Fatalf("期望使用默认去重状态路径，实际为 %s", cfg.DedupStorePath)
 	}
 
+	if cfg.MySQLTable != defaultMySQLTable {
+		t.Fatalf("期望使用默认 MySQL 表名，实际为 %s", cfg.MySQLTable)
+	}
+
 	if cfg.SendEmptyReport {
 		t.Fatal("默认不应推送空日报")
 	}
@@ -119,6 +133,7 @@ func TestLoadFromJSONFile(t *testing.T) {
   "http": {"addr": ":7070"},
   "auth": {"token": "file-token"},
   "redis": {"addr": "redis:6379", "password": "file-secret", "db": 1, "dedup_key": "file:dedup"},
+  "mysql": {"dsn": "user:pass@tcp(mysql:3306)/infohub?parseTime=true", "table": "report_records"},
   "scheduler": {"interval_seconds": 300}
 }`
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
@@ -150,6 +165,10 @@ func TestLoadFromJSONFile(t *testing.T) {
 	if cfg.RedisAddr != "redis:6379" || cfg.RedisPassword != "file-secret" || cfg.RedisDB != 1 || cfg.RedisDedupKey != "file:dedup" {
 		t.Fatalf("期望读取文件中的 Redis 配置，实际为 %+v", cfg)
 	}
+
+	if cfg.MySQLDSN != "user:pass@tcp(mysql:3306)/infohub?parseTime=true" || cfg.MySQLTable != "report_records" {
+		t.Fatalf("期望读取文件中的 MySQL 配置，实际为 %+v", cfg)
+	}
 }
 
 func TestLoadEnvOverridesJSONFile(t *testing.T) {
@@ -157,7 +176,8 @@ func TestLoadEnvOverridesJSONFile(t *testing.T) {
 	content := `{
   "rss": {"urls": ["https://example.com/file.xml"]},
   "ai": {"endpoint": "https://api.example.com/file", "api_key": "file-key", "model": "file-model"},
-  "http": {"addr": ":7070"}
+  "http": {"addr": ":7070"},
+  "mysql": {"dsn": "user:pass@tcp(mysql:3306)/infohub?parseTime=true", "table": "file_reports"}
 }`
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatalf("写入测试配置失败：%v", err)
@@ -165,6 +185,7 @@ func TestLoadEnvOverridesJSONFile(t *testing.T) {
 	t.Setenv("INFOHUB_CONFIG_PATH", path)
 	t.Setenv("INFOHUB_AI_MODEL", "env-model")
 	t.Setenv("INFOHUB_HTTP_ADDR", ":9090")
+	t.Setenv("INFOHUB_MYSQL_TABLE", "env_reports")
 
 	cfg, err := Load()
 	if err != nil {
@@ -177,6 +198,10 @@ func TestLoadEnvOverridesJSONFile(t *testing.T) {
 
 	if cfg.HTTPAddr != ":9090" {
 		t.Fatalf("期望环境变量覆盖 HTTP 地址，实际为 %s", cfg.HTTPAddr)
+	}
+
+	if cfg.MySQLTable != "env_reports" {
+		t.Fatalf("期望环境变量覆盖 MySQL 表名，实际为 %s", cfg.MySQLTable)
 	}
 }
 

@@ -33,6 +33,10 @@
     "db": 0,
     "dedup_key": "infohub:dedup:seen"
   },
+  "mysql": {
+    "dsn": "",
+    "table": "reports"
+  },
   "scheduler": {
     "interval_seconds": 3600
   }

@@ -15,6 +15,7 @@ const defaultStorageDir = "data/reports"
 const defaultHTTPAddr = ":8080"
 const defaultDedupStorePath = "data/dedup/seen.json"
 const defaultRedisDedupKey = "infohub:dedup:seen"
+const defaultMySQLTable = "reports"
 
 // Config 保存信息汇总 Agent 的运行配置。
 type Config struct {
@@ -34,6 +35,8 @@ type Config struct {
 	RedisPassword    string
 	RedisDB          int
 	RedisDedupKey    string
+	MySQLDSN         string
+	MySQLTable       string
 }
 
 // Load 先读取 JSON 配置文件，再使用环境变量覆盖。
@@ -72,6 +75,11 @@ func (c Config) UseWebhook() bool {
 	return c.WebhookURL != ""
 }
 
+// UseMySQL 判断是否启用 MySQL 日报存储。
+func (c Config) UseMySQL() bool {
+	return c.MySQLDSN != ""
+}
+
 func defaultConfig() Config {
 	return Config{
 		ScheduleInterval: defaultScheduleInterval,
@@ -79,6 +87,7 @@ func defaultConfig() Config {
 		HTTPAddr:         defaultHTTPAddr,
 		DedupStorePath:   defaultDedupStorePath,
 		RedisDedupKey:    defaultRedisDedupKey,
+		MySQLTable:       defaultMySQLTable,
 	}
 }
 
@@ -146,6 +155,12 @@ func mergeConfig(base, override Config) Config {
 	if override.RedisDedupKey != "" {
 		base.RedisDedupKey = override.RedisDedupKey
 	}
+	if override.MySQLDSN != "" {
+		base.MySQLDSN = override.MySQLDSN
+	}
+	if override.MySQLTable != "" {
+		base.MySQLTable = override.MySQLTable
+	}
 
 	return base
 }
@@ -170,6 +185,8 @@ func applyEnv(cfg Config) Config {
 	cfg.RedisPassword = readString("INFOHUB_REDIS_PASSWORD", cfg.RedisPassword)
 	cfg.RedisDB = readInt("INFOHUB_REDIS_DB", cfg.RedisDB)
 	cfg.RedisDedupKey = readString("INFOHUB_REDIS_DEDUP_KEY", cfg.RedisDedupKey)
+	cfg.MySQLDSN = readString("INFOHUB_MYSQL_DSN", cfg.MySQLDSN)
+	cfg.MySQLTable = readString("INFOHUB_MYSQL_TABLE", cfg.MySQLTable)
 
 	return cfg
 }
@@ -206,6 +223,10 @@ type fileConfig struct {
 		DB       int    `json:"db"`
 		DedupKey string `json:"dedup_key"`
 	} `json:"redis"`
+	MySQL struct {
+		DSN   string `json:"dsn"`
+		Table string `json:"table"`
+	} `json:"mysql"`
 	Scheduler struct {
 		IntervalSeconds int `json:"interval_seconds"`
 	} `json:"scheduler"`
@@ -228,6 +249,8 @@ func (f fileConfig) toConfig() Config {
 		RedisPassword:   f.Redis.Password,
 		RedisDB:         f.Redis.DB,
 		RedisDedupKey:   f.Redis.DedupKey,
+		MySQLDSN:        f.MySQL.DSN,
+		MySQLTable:      firstNonEmpty(f.MySQL.Table, defaultMySQLTable),
 	}
 
 	if f.Scheduler.IntervalSeconds > 0 {
