@@ -8,6 +8,9 @@
     "max_items_per_feed": 15,
     "recent_within_hours": 168
   },
+  "report": {
+    "max_items": 12
+  },
   "ai": {
     "endpoint": "",
     "api_key": "",

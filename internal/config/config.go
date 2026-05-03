@@ -23,6 +23,7 @@ type Config struct {
 	RSSURLs          []string
 	RSSMaxItems      int
 	RSSRecentWithin  time.Duration
+	ReportMaxItems   int
 	AIEndpoint       string
 	AIAPIKey         string
 	AIModel          string
@@ -121,6 +122,9 @@ func mergeConfig(base, override Config) Config {
 	if override.RSSRecentWithin > 0 {
 		base.RSSRecentWithin = override.RSSRecentWithin
 	}
+	if override.ReportMaxItems > 0 {
+		base.ReportMaxItems = override.ReportMaxItems
+	}
 	if override.AIEndpoint != "" {
 		base.AIEndpoint = override.AIEndpoint
 	}
@@ -181,6 +185,7 @@ func applyEnv(cfg Config) Config {
 	cfg.RSSURLs = readList("INFOHUB_RSS_URLS", firstNonEmpty(cfg.RSSURL, strings.Join(cfg.RSSURLs, ",")))
 	cfg.RSSMaxItems = readInt("INFOHUB_RSS_MAX_ITEMS_PER_FEED", cfg.RSSMaxItems)
 	cfg.RSSRecentWithin = readHours("INFOHUB_RSS_RECENT_WITHIN_HOURS", cfg.RSSRecentWithin)
+	cfg.ReportMaxItems = readInt("INFOHUB_REPORT_MAX_ITEMS", cfg.ReportMaxItems)
 	cfg.AIEndpoint = readString("INFOHUB_AI_ENDPOINT", cfg.AIEndpoint)
 	cfg.AIAPIKey = readString("INFOHUB_AI_API_KEY", cfg.AIAPIKey)
 	cfg.AIModel = readString("INFOHUB_AI_MODEL", cfg.AIModel)
@@ -208,6 +213,9 @@ type fileConfig struct {
 		MaxItemsPerFeed   int      `json:"max_items_per_feed"`
 		RecentWithinHours int      `json:"recent_within_hours"`
 	} `json:"rss"`
+	Report struct {
+		MaxItems int `json:"max_items"`
+	} `json:"report"`
 	AI struct {
 		Endpoint string `json:"endpoint"`
 		APIKey   string `json:"api_key"`
@@ -264,6 +272,7 @@ func (f fileConfig) toConfig() Config {
 		RedisDedupKey:   f.Redis.DedupKey,
 		MySQLDSN:        f.MySQL.DSN,
 		MySQLTable:      firstNonEmpty(f.MySQL.Table, defaultMySQLTable),
+		ReportMaxItems:  f.Report.MaxItems,
 	}
 
 	if f.Scheduler.IntervalSeconds > 0 {

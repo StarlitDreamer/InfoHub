@@ -92,6 +92,7 @@ Common environment variables:
 - `INFOHUB_RSS_URLS`
 - `INFOHUB_RSS_MAX_ITEMS_PER_FEED`
 - `INFOHUB_RSS_RECENT_WITHIN_HOURS`
+- `INFOHUB_REPORT_MAX_ITEMS`
 - `INFOHUB_AI_ENDPOINT`
 - `INFOHUB_AI_API_KEY`
 - `INFOHUB_AI_MODEL`
@@ -196,6 +197,12 @@ $env:INFOHUB_CONFIG_PATH="/app/configs/config.local.json"
 docker compose up --build
 ```
 
+If you want to override the Markdown display cap explicitly at startup:
+
+```bash
+INFOHUB_REPORT_MAX_ITEMS=12 docker compose up --build
+```
+
 This starts:
 
 - `mysql:8.4` on `localhost:3306`
@@ -229,6 +236,7 @@ The local RSS config also trims feed volume by default:
 
 - keep only items from the last `168` hours
 - keep at most `15` items per feed
+- render only the top `12` items in the Markdown report
 
 ## Current limitations
 

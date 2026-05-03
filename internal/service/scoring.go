@@ -17,6 +17,17 @@ func SortByDecisionScore(items []model.NewsItem, now time.Time) []model.NewsItem
 	return result
 }
 
+// LimitItems 保留前 n 条，n 小于等于 0 时返回全部结果。
+func LimitItems(items []model.NewsItem, n int) []model.NewsItem {
+	if n <= 0 || len(items) <= n {
+		return append([]model.NewsItem(nil), items...)
+	}
+
+	result := make([]model.NewsItem, n)
+	copy(result, items[:n])
+	return result
+}
+
 func decisionScore(item model.NewsItem, now time.Time) float64 {
 	freshness := 1 / (1 + now.Sub(item.PublishTime).Hours())
 	tagHeat := float64(len(item.Tags)) * 0.2

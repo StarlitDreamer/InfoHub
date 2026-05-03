@@ -12,6 +12,7 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("INFOHUB_RSS_URLS", "https://example.com/a.xml, https://example.com/b.xml")
 	t.Setenv("INFOHUB_RSS_MAX_ITEMS_PER_FEED", "20")
 	t.Setenv("INFOHUB_RSS_RECENT_WITHIN_HOURS", "72")
+	t.Setenv("INFOHUB_REPORT_MAX_ITEMS", "12")
 	t.Setenv("INFOHUB_AI_ENDPOINT", "https://api.example.com/v1/chat/completions")
 	t.Setenv("INFOHUB_AI_API_KEY", "test-key")
 	t.Setenv("INFOHUB_AI_MODEL", "test-model")
@@ -37,7 +38,7 @@ func TestLoadFromEnv(t *testing.T) {
 	if len(cfg.RSSURLs) != 2 {
 		t.Fatalf("expected 2 RSS urls, got %d", len(cfg.RSSURLs))
 	}
-	if cfg.RSSMaxItems != 20 || cfg.RSSRecentWithin != 72*time.Hour {
+	if cfg.RSSMaxItems != 20 || cfg.RSSRecentWithin != 72*time.Hour || cfg.ReportMaxItems != 12 {
 		t.Fatalf("unexpected RSS trimming config: %+v", cfg)
 	}
 	if !cfg.UseRealAI() {
@@ -114,6 +115,7 @@ func TestLoadFromJSONFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	content := `{
   "rss": {"urls": ["https://example.com/a.xml", "https://example.com/b.xml"], "max_items_per_feed": 10, "recent_within_hours": 48},
+  "report": {"max_items": 15},
   "ai": {"endpoint": "https://api.example.com/v1/chat/completions", "api_key": "file-key", "model": "file-model"},
   "webhook": {"url": "https://example.com/webhook", "send_empty_report": true},
   "storage": {"dir": "file/reports"},
@@ -137,7 +139,7 @@ func TestLoadFromJSONFile(t *testing.T) {
 	if len(cfg.RSSURLs) != 2 {
 		t.Fatalf("expected 2 RSS urls, got %d", len(cfg.RSSURLs))
 	}
-	if cfg.RSSMaxItems != 10 || cfg.RSSRecentWithin != 48*time.Hour {
+	if cfg.RSSMaxItems != 10 || cfg.RSSRecentWithin != 48*time.Hour || cfg.ReportMaxItems != 15 {
 		t.Fatalf("unexpected RSS trimming config: %+v", cfg)
 	}
 	if cfg.AIAPIKey != "file-key" {

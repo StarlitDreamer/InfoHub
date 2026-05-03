@@ -74,13 +74,15 @@ func runReportWithRepository(ctx context.Context, cfg config.Config, repo reposi
 		return server.ReportResult{}, err
 	}
 
-	report := delivery.RenderMarkdown(items)
+	sortedItems := service.SortByDecisionScore(items, timeNow())
+	displayItems := service.LimitItems(sortedItems, cfg.ReportMaxItems)
+	report := delivery.RenderMarkdown(displayItems)
 	fmt.Print(report)
 
 	if err := repo.Save(ctx, repository.ReportRecord{
 		GeneratedAt: timeNow(),
 		Markdown:    report,
-		Items:       items,
+		Items:       sortedItems,
 	}); err != nil {
 		return server.ReportResult{}, err
 	}
@@ -91,7 +93,7 @@ func runReportWithRepository(ctx context.Context, cfg config.Config, repo reposi
 		}
 	}
 
-	return server.ReportResult{ItemCount: len(items)}, nil
+	return server.ReportResult{ItemCount: len(sortedItems)}, nil
 }
 
 func runSchedule(ctx context.Context, cfg config.Config) error {
