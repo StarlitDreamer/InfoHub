@@ -34,7 +34,7 @@
     "dedup_key": "infohub:dedup:seen"
   },
   "mysql": {
-    "dsn": "",
+    "dsn": "infohub:infohub@tcp(mysql:3306)/infohub?charset=utf8mb4&parseTime=true&loc=Local",
     "table": "reports"
   },
   "scheduler": {

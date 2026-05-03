@@ -3,3 +3,4 @@
 data/
 cmd/items/
 cmd/reports/
+.gomodcache/

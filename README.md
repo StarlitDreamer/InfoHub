@@ -1,212 +1,215 @@
 # InfoHub Agent
 
-InfoHub Agent 是一个信息汇总与决策辅助 Agent，用于从 RSS 等来源采集信息，完成去重、AI 摘要、评分、日报生成、文件落盘，并通过 CLI、定时任务或 HTTP API 对外提供能力。
+InfoHub Agent is an information aggregation and decision-support service. It collects content from RSS and demo sources, deduplicates items, runs AI summarization and scoring, and outputs a decision-ready daily report.
 
-## 当前能力
+## Current capabilities
 
-- 支持 Demo 数据源和多 RSS 数据源聚合。
-- 支持单次运行、定时运行和 Gin HTTP 服务模式。
-- 支持 mock AI 和 OpenAI 兼容 Chat Completions 接口。
-- 支持 Markdown 日报输出和 Webhook 推送。
-- 支持文件型日报存储，保存 Markdown 和 NewsItem JSON。
-- 支持跨运行去重，默认使用本地文件保存已处理指纹。
-- 支持 JSON 配置文件和环境变量配置，环境变量优先级更高。
+- Demo crawler and multi-RSS aggregation
+- Mock AI processor and OpenAI-compatible Chat Completions client
+- In-run and cross-run deduplication
+- Markdown report rendering
+- File-backed or MySQL-backed report storage
+- Webhook delivery
+- Manual run, scheduler mode, and Gin HTTP API
+- JSON config plus environment variable overrides
+- Redis-backed dedup store
 
-## 快速开始
+## Project layout
 
-运行测试：
+```text
+cmd/
+configs/
+internal/
+  ai/
+  config/
+  crawler/
+  delivery/
+  model/
+  processor/
+  repository/
+  scheduler/
+  server/
+  service/
+scripts/
+```
+
+## Quick start
+
+Run tests:
 
 ```bash
 go test ./...
 ```
 
-生成一次日报：
+Generate one report:
 
 ```bash
 go run cmd/main.go run-once
 ```
 
-启动定时任务：
+Start scheduler mode:
 
 ```bash
 go run cmd/main.go schedule
 ```
 
-启动 HTTP 服务：
+Start HTTP server:
 
 ```bash
 go run cmd/main.go serve
 ```
 
-未传运行模式时，默认等同于 `run-once`。
+If no mode is passed, the app defaults to `run-once`.
 
-## 配置方式
+## Configuration
 
-推荐使用 JSON 配置文件：
+Use the bundled JSON example:
 
 ```bash
 INFOHUB_CONFIG_PATH=configs/config.example.json go run cmd/main.go run-once
 ```
 
-Windows PowerShell 示例：
+PowerShell example:
 
 ```powershell
-$env:INFOHUB_CONFIG_PATH="D:\code\go\InfoHub\configs\config.example.json"
+$env:INFOHUB_CONFIG_PATH="D:\code\GolandProjects\InfoHub\configs\config.example.json"
 go run cmd\main.go run-once
 ```
 
-配置文件示例见 [configs/config.example.json](configs/config.example.json)。
+The example files are:
 
-也可以使用环境变量配置，示例见 [configs/config.example.env](configs/config.example.env)。当 JSON 配置和环境变量同时存在时，环境变量会覆盖 JSON 配置。
+- [configs/config.example.json](D:/code/GolandProjects/InfoHub/configs/config.example.json)
+- [configs/config.example.env](D:/code/GolandProjects/InfoHub/configs/config.example.env)
 
-常用环境变量：
+Common environment variables:
 
-- `INFOHUB_CONFIG_PATH`：JSON 配置文件路径。
-- `INFOHUB_RSS_URL`：单个 RSS 数据源。
-- `INFOHUB_RSS_URLS`：多个 RSS 数据源，逗号分隔，优先于 `INFOHUB_RSS_URL`。
-- `INFOHUB_AI_ENDPOINT`：OpenAI 兼容接口地址。
-- `INFOHUB_AI_API_KEY`：AI API Key。
-- `INFOHUB_AI_MODEL`：AI 模型名。
-- `INFOHUB_WEBHOOK_URL`：Webhook 推送地址。
-- `INFOHUB_SEND_EMPTY_REPORT`：无新增信息时是否仍推送 Webhook，默认 `false`。
-- `INFOHUB_STORAGE_DIR`：日报和 JSON 快照保存目录，默认 `data/reports`。
-- `INFOHUB_DEDUP_STORE_PATH`：跨运行去重状态文件，默认 `data/dedup/seen.json`。
-- `INFOHUB_HTTP_ADDR`：Gin HTTP 服务监听地址，默认 `:8080`。
-- `INFOHUB_AUTH_TOKEN`：Gin API 鉴权 token，留空时不启用鉴权。
-- `INFOHUB_REDIS_ADDR`：Redis 地址，留空时使用文件版去重。
-- `INFOHUB_REDIS_PASSWORD`：Redis 密码。
-- `INFOHUB_REDIS_DB`：Redis DB，默认 `0`。
-- `INFOHUB_REDIS_DEDUP_KEY`：Redis 去重 set key，默认 `infohub:dedup:seen`。
-- `INFOHUB_SCHEDULE_INTERVAL_SECONDS`：定时任务间隔秒数，默认 `3600`。
+- `INFOHUB_CONFIG_PATH`
+- `INFOHUB_RSS_URL`
+- `INFOHUB_RSS_URLS`
+- `INFOHUB_AI_ENDPOINT`
+- `INFOHUB_AI_API_KEY`
+- `INFOHUB_AI_MODEL`
+- `INFOHUB_WEBHOOK_URL`
+- `INFOHUB_SEND_EMPTY_REPORT`
+- `INFOHUB_STORAGE_DIR`
+- `INFOHUB_DEDUP_STORE_PATH`
+- `INFOHUB_HTTP_ADDR`
+- `INFOHUB_AUTH_TOKEN`
+- `INFOHUB_REDIS_ADDR`
+- `INFOHUB_REDIS_PASSWORD`
+- `INFOHUB_REDIS_DB`
+- `INFOHUB_REDIS_DEDUP_KEY`
+- `INFOHUB_MYSQL_DSN`
+- `INFOHUB_MYSQL_TABLE`
+- `INFOHUB_SCHEDULE_INTERVAL_SECONDS`
 
 ## HTTP API
 
-启动服务：
-
-```bash
-go run cmd/main.go serve
-```
-
-如果配置了 `INFOHUB_AUTH_TOKEN` 或 JSON 中的 `auth.token`，除 `/health` 外的接口都需要请求头：
-
-```http
-Authorization: Bearer <token>
-```
-
-健康检查：
+Health check:
 
 ```http
 GET /health
 ```
 
-手动生成日报：
+Run report generation:
 
 ```http
 POST /reports/run
 ```
 
-响应示例：
-
-```json
-{
-  "status": "generated",
-  "item_count": 3
-}
-```
-
-读取最新日报：
+Read latest report:
 
 ```http
 GET /reports/latest
 ```
 
-列出历史日报：
+List historical reports:
 
 ```http
 GET /reports
 ```
 
-## 数据落盘
+If `INFOHUB_AUTH_TOKEN` is configured, all endpoints except `/health` require:
 
-默认目录：
-
-```text
-data/reports/
-├── reports/
-│   └── 20260503-153000.md
-└── items/
-    └── 20260503-153000.json
+```http
+Authorization: Bearer <token>
 ```
 
-跨运行去重状态默认保存到：
+## Report storage
+
+### File storage
+
+Default output paths:
 
 ```text
+data/reports/reports/<timestamp>.md
+data/reports/items/<timestamp>.json
 data/dedup/seen.json
 ```
 
-这些运行数据默认被 `.gitignore` 忽略。
+### MySQL storage
 
-## Docker 部署
+Set `INFOHUB_MYSQL_DSN` to enable MySQL-backed report storage. If it is empty, the app uses file storage.
 
-构建镜像：
+Default table name:
+
+```text
+reports
+```
+
+The MySQL initialization SQL is stored at:
+
+```text
+scripts/mysql/init/001_create_reports.sql
+```
+
+## Docker
+
+Build the image:
 
 ```bash
 docker build -t infohub-agent:local .
 ```
 
-运行容器：
-
-```bash
-docker run --rm -p 8080:8080 \
-  -e INFOHUB_CONFIG_PATH=/app/configs/config.example.json \
-  -v "$(pwd)/configs/config.example.json:/app/configs/config.example.json:ro" \
-  -v "$(pwd)/data:/app/data" \
-  infohub-agent:local
-```
-
-使用 Docker Compose：
+Run the full local stack:
 
 ```bash
 docker compose up --build
 ```
 
-容器默认以 `serve` 模式启动，并监听 `:8080`。运行数据会写入挂载的 `./data` 目录。
+This starts:
 
-## 去重行为
+- `mysql:8.4` on `localhost:3306`
+- `redis:7` on `localhost:6379`
+- `infohub-agent` on `localhost:8080`
 
-系统会先做单次运行内标题去重，再做跨运行去重。跨运行去重 key 优先使用 URL；URL 为空时使用标题，并通过 SHA-256 生成稳定指纹。
-
-默认使用文件版跨运行去重。如果配置了 Redis 地址，则使用 Redis set：
-
-```bash
-INFOHUB_REDIS_ADDR=localhost:6379
-INFOHUB_REDIS_DEDUP_KEY=infohub:dedup:seen
-```
-
-当没有新增信息时，日报会输出：
-
-```md
-# 今日信息
-
-今日暂无新增信息。
-```
-
-默认不会推送空日报。如需推送，设置：
+Start only dependencies:
 
 ```bash
-INFOHUB_SEND_EMPTY_REPORT=true
+docker compose up -d mysql redis
 ```
 
-## 当前限制
+Default DSN on the host machine:
 
-- RSS 解析目前覆盖基础 RSS 字段，尚未支持复杂 Feed 清洗。
-- mock AI 可用于本地开发；真实摘要需要配置 OpenAI 兼容接口。
-- 当前存储为文件版，尚未接入 MySQL。
-- Redis 去重已支持，但 TTL 和按日期分桶尚未实现。
-- Gin API 支持 Bearer Token 鉴权，部署到公网前仍建议放在反向代理或内网访问控制之后。
+```text
+infohub:infohub@tcp(localhost:3306)/infohub?charset=utf8mb4&parseTime=true&loc=Local
+```
 
-## 建议下一步
+Default DSN inside Docker Compose:
 
-- 接入 MySQL repository。
-- 增强 RSS 内容清洗和 HTML 摘要提取。
-- 增加生产环境反向代理和 HTTPS 示例。
+```text
+infohub:infohub@tcp(mysql:3306)/infohub?charset=utf8mb4&parseTime=true&loc=Local
+```
+
+## Current limitations
+
+- RSS parsing focuses on common fields and does not yet do deeper HTML extraction.
+- Real AI summaries depend on an OpenAI-compatible endpoint.
+- Redis dedup does not yet implement TTL or date partitioning.
+- Public deployment should still sit behind a reverse proxy.
+
+## Suggested next steps
+
+- Improve RSS HTML cleaning and content extraction
+- Add production reverse proxy and HTTPS examples
+- Add MySQL integration tests against a real container

@@ -1,0 +1,15 @@
+CREATE DATABASE IF NOT EXISTS infohub
+  DEFAULT CHARACTER SET utf8mb4
+  DEFAULT COLLATE utf8mb4_unicode_ci;
+
+USE infohub;
+
+CREATE TABLE IF NOT EXISTS reports (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  generated_at DATETIME(6) NOT NULL,
+  markdown LONGTEXT NOT NULL,
+  items_json LONGTEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_generated_at (generated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

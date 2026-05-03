@@ -1,10 +1,39 @@
 services:
+  mysql:
+    image: mysql:8.4
+    container_name: infohub-mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: infohub
+      MYSQL_USER: infohub
+      MYSQL_PASSWORD: infohub
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./scripts/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
   infohub:
     build:
       context: .
       dockerfile: Dockerfile
     image: infohub-agent:local
     container_name: infohub-agent
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
     ports:
       - "8080:8080"
     environment:
@@ -25,4 +54,5 @@ services:
     restart: unless-stopped
 
 volumes:
+  mysql-data:
   redis-data:
