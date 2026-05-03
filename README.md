@@ -72,6 +72,7 @@ go run cmd\main.go run-once
 - `INFOHUB_STORAGE_DIR`：日报和 JSON 快照保存目录，默认 `data/reports`。
 - `INFOHUB_DEDUP_STORE_PATH`：跨运行去重状态文件，默认 `data/dedup/seen.json`。
 - `INFOHUB_HTTP_ADDR`：Gin HTTP 服务监听地址，默认 `:8080`。
+- `INFOHUB_AUTH_TOKEN`：Gin API 鉴权 token，留空时不启用鉴权。
 - `INFOHUB_SCHEDULE_INTERVAL_SECONDS`：定时任务间隔秒数，默认 `3600`。
 
 ## HTTP API
@@ -80,6 +81,12 @@ go run cmd\main.go run-once
 
 ```bash
 go run cmd/main.go serve
+```
+
+如果配置了 `INFOHUB_AUTH_TOKEN` 或 JSON 中的 `auth.token`，除 `/health` 外的接口都需要请求头：
+
+```http
+Authorization: Bearer <token>
 ```
 
 健康检查：
@@ -159,11 +166,10 @@ INFOHUB_SEND_EMPTY_REPORT=true
 - mock AI 可用于本地开发；真实摘要需要配置 OpenAI 兼容接口。
 - 当前存储为文件版，尚未接入 MySQL。
 - 当前跨运行去重为文件版，尚未接入 Redis。
-- Gin API 尚未加入鉴权，部署到公网前需要增加访问控制。
+- Gin API 支持 Bearer Token 鉴权，部署到公网前仍建议放在反向代理或内网访问控制之后。
 
 ## 建议下一步
 
-- 增加 API 鉴权。
 - 接入 Redis 版跨运行去重。
 - 接入 MySQL repository。
 - 增强 RSS 内容清洗和 HTML 摘要提取。

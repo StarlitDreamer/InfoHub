@@ -28,6 +28,7 @@ type Config struct {
 	HTTPAddr         string
 	DedupStorePath   string
 	SendEmptyReport  bool
+	AuthToken        string
 }
 
 // Load 先读取 JSON 配置文件，再使用环境变量覆盖。
@@ -124,6 +125,9 @@ func mergeConfig(base, override Config) Config {
 	if override.SendEmptyReport {
 		base.SendEmptyReport = true
 	}
+	if override.AuthToken != "" {
+		base.AuthToken = override.AuthToken
+	}
 
 	return base
 }
@@ -143,6 +147,7 @@ func applyEnv(cfg Config) Config {
 	cfg.HTTPAddr = readString("INFOHUB_HTTP_ADDR", cfg.HTTPAddr)
 	cfg.DedupStorePath = readString("INFOHUB_DEDUP_STORE_PATH", cfg.DedupStorePath)
 	cfg.SendEmptyReport = readBool("INFOHUB_SEND_EMPTY_REPORT", cfg.SendEmptyReport)
+	cfg.AuthToken = readString("INFOHUB_AUTH_TOKEN", cfg.AuthToken)
 
 	return cfg
 }
@@ -170,6 +175,9 @@ type fileConfig struct {
 	HTTP struct {
 		Addr string `json:"addr"`
 	} `json:"http"`
+	Auth struct {
+		Token string `json:"token"`
+	} `json:"auth"`
 	Scheduler struct {
 		IntervalSeconds int `json:"interval_seconds"`
 	} `json:"scheduler"`
@@ -187,6 +195,7 @@ func (f fileConfig) toConfig() Config {
 		StorageDir:      f.Storage.Dir,
 		HTTPAddr:        f.HTTP.Addr,
 		DedupStorePath:  f.Dedup.StorePath,
+		AuthToken:       f.Auth.Token,
 	}
 
 	if f.Scheduler.IntervalSeconds > 0 {

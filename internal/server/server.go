@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -19,8 +20,13 @@ type ReportResult struct {
 	ItemCount int `json:"item_count"`
 }
 
+// Options 保存 HTTP 服务选项。
+type Options struct {
+	AuthToken string
+}
+
 // NewRouter 创建 HTTP 路由。
-func NewRouter(repo repository.ReportRepository, runner ReportRunner) *gin.Engine {
+func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Options) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -29,7 +35,10 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner) *gin.Engin
 		ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	router.POST("/reports/run", func(ctx *gin.Context) {
+	protected := router.Group("")
+	protected.Use(authMiddleware(options.AuthToken))
+
+	protected.POST("/reports/run", func(ctx *gin.Context) {
 		result, err := runner(ctx.Request.Context())
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -42,7 +51,7 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner) *gin.Engin
 		})
 	})
 
-	router.GET("/reports/latest", func(ctx *gin.Context) {
+	protected.GET("/reports/latest", func(ctx *gin.Context) {
 		record, err := repo.Latest(ctx.Request.Context())
 		if err != nil {
 			if errors.Is(err, repository.ErrReportNotFound) {
@@ -61,7 +70,7 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner) *gin.Engin
 		})
 	})
 
-	router.GET("/reports", func(ctx *gin.Context) {
+	protected.GET("/reports", func(ctx *gin.Context) {
 		records, err := repo.List(ctx.Request.Context())
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -72,4 +81,22 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner) *gin.Engin
 	})
 
 	return router
+}
+
+func authMiddleware(token string) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		if token == "" {
+			ctx.Next()
+			return
+		}
+
+		header := ctx.GetHeader("Authorization")
+		value, ok := strings.CutPrefix(header, "Bearer ")
+		if !ok || value != token {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			return
+		}
+
+		ctx.Next()
+	}
 }

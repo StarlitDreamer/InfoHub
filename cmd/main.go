@@ -112,7 +112,7 @@ func runServer(cfg config.Config) error {
 	repo := repository.NewFileReportRepository(cfg.StorageDir)
 	router := server.NewRouter(repo, func(ctx context.Context) (server.ReportResult, error) {
 		return runReport(ctx, cfg)
-	})
+	}, server.Options{AuthToken: cfg.AuthToken})
 
 	return router.Run(cfg.HTTPAddr)
 }

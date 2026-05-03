@@ -15,7 +15,7 @@ import (
 func TestHealth(t *testing.T) {
 	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
 		return ReportResult{}, nil
-	})
+	}, Options{})
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/health", nil)
 
@@ -31,7 +31,7 @@ func TestRunReport(t *testing.T) {
 	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
 		called = true
 		return ReportResult{ItemCount: 3}, nil
-	})
+	}, Options{})
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/reports/run", nil)
 
@@ -59,7 +59,7 @@ func TestLatestReport(t *testing.T) {
 	})
 	router := NewRouter(repo, func(context.Context) (ReportResult, error) {
 		return ReportResult{}, nil
-	})
+	}, Options{})
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/reports/latest", nil)
 
@@ -67,6 +67,64 @@ func TestLatestReport(t *testing.T) {
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("期望状态码 200，实际为 %d", recorder.Code)
+	}
+}
+
+func TestAuthRequiredWhenTokenConfigured(t *testing.T) {
+	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
+		return ReportResult{}, nil
+	}, Options{AuthToken: "secret"})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/reports", nil)
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("期望状态码 401，实际为 %d", recorder.Code)
+	}
+}
+
+func TestAuthRejectsWrongToken(t *testing.T) {
+	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
+		return ReportResult{}, nil
+	}, Options{AuthToken: "secret"})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/reports", nil)
+	request.Header.Set("Authorization", "Bearer wrong")
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("期望状态码 401，实际为 %d", recorder.Code)
+	}
+}
+
+func TestAuthAcceptsBearerToken(t *testing.T) {
+	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
+		return ReportResult{}, nil
+	}, Options{AuthToken: "secret"})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/reports", nil)
+	request.Header.Set("Authorization", "Bearer secret")
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("期望状态码 200，实际为 %d", recorder.Code)
+	}
+}
+
+func TestHealthSkipsAuth(t *testing.T) {
+	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
+		return ReportResult{}, nil
+	}, Options{AuthToken: "secret"})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/health", nil)
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("期望健康检查不需要鉴权，实际状态码为 %d", recorder.Code)
 	}
 }
 

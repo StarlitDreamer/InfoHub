@@ -19,6 +19,7 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("INFOHUB_HTTP_ADDR", ":9090")
 	t.Setenv("INFOHUB_DEDUP_STORE_PATH", "tmp/dedup/seen.json")
 	t.Setenv("INFOHUB_SEND_EMPTY_REPORT", "true")
+	t.Setenv("INFOHUB_AUTH_TOKEN", "env-token")
 
 	cfg := LoadFromEnv()
 
@@ -56,6 +57,10 @@ func TestLoadFromEnv(t *testing.T) {
 
 	if !cfg.SendEmptyReport {
 		t.Fatal("期望启用空日报推送")
+	}
+
+	if cfg.AuthToken != "env-token" {
+		t.Fatalf("期望读取鉴权 token，实际为 %s", cfg.AuthToken)
 	}
 }
 
@@ -104,6 +109,7 @@ func TestLoadFromJSONFile(t *testing.T) {
   "storage": {"dir": "file/reports"},
   "dedup": {"store_path": "file/dedup/seen.json"},
   "http": {"addr": ":7070"},
+  "auth": {"token": "file-token"},
   "scheduler": {"interval_seconds": 300}
 }`
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
@@ -126,6 +132,10 @@ func TestLoadFromJSONFile(t *testing.T) {
 
 	if cfg.ScheduleInterval != 300*time.Second {
 		t.Fatalf("期望调度间隔为 300 秒，实际为 %s", cfg.ScheduleInterval)
+	}
+
+	if cfg.AuthToken != "file-token" {
+		t.Fatalf("期望读取文件中的鉴权 token，实际为 %s", cfg.AuthToken)
 	}
 }
 

@@ -24,6 +24,9 @@
   "http": {
     "addr": ":8080"
   },
+  "auth": {
+    "token": ""
+  },
   "scheduler": {
     "interval_seconds": 3600
   }
