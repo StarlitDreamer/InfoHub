@@ -1,0 +1,30 @@
+{
+  "rss": {
+    "url": "",
+    "urls": [
+      "https://example.com/a.xml",
+      "https://example.com/b.xml"
+    ]
+  },
+  "ai": {
+    "endpoint": "https://api.openai.com/v1/chat/completions",
+    "api_key": "replace-with-your-api-key",
+    "model": "gpt-4.1-mini"
+  },
+  "webhook": {
+    "url": "https://example.com/webhook",
+    "send_empty_report": false
+  },
+  "storage": {
+    "dir": "data/reports"
+  },
+  "dedup": {
+    "store_path": "data/dedup/seen.json"
+  },
+  "http": {
+    "addr": ":8080"
+  },
+  "scheduler": {
+    "interval_seconds": 3600
+  }
+}

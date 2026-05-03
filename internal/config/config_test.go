@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -90,5 +92,85 @@ func TestLoadFromEnvUsesFallbackInterval(t *testing.T) {
 
 	if cfg.SendEmptyReport {
 		t.Fatal("默认不应推送空日报")
+	}
+}
+
+func TestLoadFromJSONFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	content := `{
+  "rss": {"urls": ["https://example.com/a.xml", "https://example.com/b.xml"]},
+  "ai": {"endpoint": "https://api.example.com/v1/chat/completions", "api_key": "file-key", "model": "file-model"},
+  "webhook": {"url": "https://example.com/webhook", "send_empty_report": true},
+  "storage": {"dir": "file/reports"},
+  "dedup": {"store_path": "file/dedup/seen.json"},
+  "http": {"addr": ":7070"},
+  "scheduler": {"interval_seconds": 300}
+}`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("写入测试配置失败：%v", err)
+	}
+	t.Setenv("INFOHUB_CONFIG_PATH", path)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("读取 JSON 配置失败：%v", err)
+	}
+
+	if len(cfg.RSSURLs) != 2 {
+		t.Fatalf("期望读取 2 个 RSS 源，实际为 %d", len(cfg.RSSURLs))
+	}
+
+	if cfg.AIAPIKey != "file-key" {
+		t.Fatalf("期望读取文件中的 AI key，实际为 %s", cfg.AIAPIKey)
+	}
+
+	if cfg.ScheduleInterval != 300*time.Second {
+		t.Fatalf("期望调度间隔为 300 秒，实际为 %s", cfg.ScheduleInterval)
+	}
+}
+
+func TestLoadEnvOverridesJSONFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	content := `{
+  "rss": {"urls": ["https://example.com/file.xml"]},
+  "ai": {"endpoint": "https://api.example.com/file", "api_key": "file-key", "model": "file-model"},
+  "http": {"addr": ":7070"}
+}`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("写入测试配置失败：%v", err)
+	}
+	t.Setenv("INFOHUB_CONFIG_PATH", path)
+	t.Setenv("INFOHUB_AI_MODEL", "env-model")
+	t.Setenv("INFOHUB_HTTP_ADDR", ":9090")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("读取配置失败：%v", err)
+	}
+
+	if cfg.AIModel != "env-model" {
+		t.Fatalf("期望环境变量覆盖 AI model，实际为 %s", cfg.AIModel)
+	}
+
+	if cfg.HTTPAddr != ":9090" {
+		t.Fatalf("期望环境变量覆盖 HTTP 地址，实际为 %s", cfg.HTTPAddr)
+	}
+}
+
+func TestLoadJSONFileWithBOM(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	content := append([]byte{0xEF, 0xBB, 0xBF}, []byte(`{"http":{"addr":":6060"}}`)...)
+	if err := os.WriteFile(path, content, 0644); err != nil {
+		t.Fatalf("写入测试配置失败：%v", err)
+	}
+	t.Setenv("INFOHUB_CONFIG_PATH", path)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("读取带 BOM 的 JSON 配置失败：%v", err)
+	}
+
+	if cfg.HTTPAddr != ":6060" {
+		t.Fatalf("期望读取 HTTP 地址 :6060，实际为 %s", cfg.HTTPAddr)
 	}
 }

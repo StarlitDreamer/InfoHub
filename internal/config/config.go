@@ -2,6 +2,8 @@
 package config
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
 	"strconv"
 	"strings"
@@ -28,22 +30,25 @@ type Config struct {
 	SendEmptyReport  bool
 }
 
+// Load 先读取 JSON 配置文件，再使用环境变量覆盖。
+func Load() (Config, error) {
+	cfg := defaultConfig()
+	path := os.Getenv("INFOHUB_CONFIG_PATH")
+	if path != "" {
+		fileConfig, err := loadFromFile(path)
+		if err != nil {
+			return Config{}, err
+		}
+
+		cfg = mergeConfig(cfg, fileConfig)
+	}
+
+	return applyEnv(cfg), nil
+}
+
 // LoadFromEnv 从环境变量加载配置。
 func LoadFromEnv() Config {
-	rssURL := os.Getenv("INFOHUB_RSS_URL")
-	return Config{
-		RSSURL:           rssURL,
-		RSSURLs:          readList("INFOHUB_RSS_URLS", rssURL),
-		AIEndpoint:       os.Getenv("INFOHUB_AI_ENDPOINT"),
-		AIAPIKey:         os.Getenv("INFOHUB_AI_API_KEY"),
-		AIModel:          os.Getenv("INFOHUB_AI_MODEL"),
-		WebhookURL:       os.Getenv("INFOHUB_WEBHOOK_URL"),
-		ScheduleInterval: readDuration("INFOHUB_SCHEDULE_INTERVAL_SECONDS", defaultScheduleInterval),
-		StorageDir:       readString("INFOHUB_STORAGE_DIR", defaultStorageDir),
-		HTTPAddr:         readString("INFOHUB_HTTP_ADDR", defaultHTTPAddr),
-		DedupStorePath:   readString("INFOHUB_DEDUP_STORE_PATH", defaultDedupStorePath),
-		SendEmptyReport:  readBool("INFOHUB_SEND_EMPTY_REPORT", false),
-	}
+	return applyEnv(defaultConfig())
 }
 
 // UseRSS 判断是否启用真实 RSS 数据源。
@@ -59,6 +64,140 @@ func (c Config) UseRealAI() bool {
 // UseWebhook 判断是否启用 Webhook 推送。
 func (c Config) UseWebhook() bool {
 	return c.WebhookURL != ""
+}
+
+func defaultConfig() Config {
+	return Config{
+		ScheduleInterval: defaultScheduleInterval,
+		StorageDir:       defaultStorageDir,
+		HTTPAddr:         defaultHTTPAddr,
+		DedupStorePath:   defaultDedupStorePath,
+	}
+}
+
+func loadFromFile(path string) (Config, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return Config{}, err
+	}
+
+	var file fileConfig
+	content = bytes.TrimPrefix(content, []byte{0xEF, 0xBB, 0xBF})
+	if err := json.Unmarshal(content, &file); err != nil {
+		return Config{}, err
+	}
+
+	return file.toConfig(), nil
+}
+
+func mergeConfig(base, override Config) Config {
+	if override.RSSURL != "" {
+		base.RSSURL = override.RSSURL
+	}
+	if len(override.RSSURLs) > 0 {
+		base.RSSURLs = override.RSSURLs
+	}
+	if override.AIEndpoint != "" {
+		base.AIEndpoint = override.AIEndpoint
+	}
+	if override.AIAPIKey != "" {
+		base.AIAPIKey = override.AIAPIKey
+	}
+	if override.AIModel != "" {
+		base.AIModel = override.AIModel
+	}
+	if override.WebhookURL != "" {
+		base.WebhookURL = override.WebhookURL
+	}
+	if override.ScheduleInterval != 0 {
+		base.ScheduleInterval = override.ScheduleInterval
+	}
+	if override.StorageDir != "" {
+		base.StorageDir = override.StorageDir
+	}
+	if override.HTTPAddr != "" {
+		base.HTTPAddr = override.HTTPAddr
+	}
+	if override.DedupStorePath != "" {
+		base.DedupStorePath = override.DedupStorePath
+	}
+	if override.SendEmptyReport {
+		base.SendEmptyReport = true
+	}
+
+	return base
+}
+
+func applyEnv(cfg Config) Config {
+	if value := os.Getenv("INFOHUB_RSS_URL"); value != "" {
+		cfg.RSSURL = value
+	}
+
+	cfg.RSSURLs = readList("INFOHUB_RSS_URLS", firstNonEmpty(cfg.RSSURL, strings.Join(cfg.RSSURLs, ",")))
+	cfg.AIEndpoint = readString("INFOHUB_AI_ENDPOINT", cfg.AIEndpoint)
+	cfg.AIAPIKey = readString("INFOHUB_AI_API_KEY", cfg.AIAPIKey)
+	cfg.AIModel = readString("INFOHUB_AI_MODEL", cfg.AIModel)
+	cfg.WebhookURL = readString("INFOHUB_WEBHOOK_URL", cfg.WebhookURL)
+	cfg.ScheduleInterval = readDuration("INFOHUB_SCHEDULE_INTERVAL_SECONDS", cfg.ScheduleInterval)
+	cfg.StorageDir = readString("INFOHUB_STORAGE_DIR", cfg.StorageDir)
+	cfg.HTTPAddr = readString("INFOHUB_HTTP_ADDR", cfg.HTTPAddr)
+	cfg.DedupStorePath = readString("INFOHUB_DEDUP_STORE_PATH", cfg.DedupStorePath)
+	cfg.SendEmptyReport = readBool("INFOHUB_SEND_EMPTY_REPORT", cfg.SendEmptyReport)
+
+	return cfg
+}
+
+type fileConfig struct {
+	RSS struct {
+		URL  string   `json:"url"`
+		URLs []string `json:"urls"`
+	} `json:"rss"`
+	AI struct {
+		Endpoint string `json:"endpoint"`
+		APIKey   string `json:"api_key"`
+		Model    string `json:"model"`
+	} `json:"ai"`
+	Webhook struct {
+		URL             string `json:"url"`
+		SendEmptyReport bool   `json:"send_empty_report"`
+	} `json:"webhook"`
+	Storage struct {
+		Dir string `json:"dir"`
+	} `json:"storage"`
+	Dedup struct {
+		StorePath string `json:"store_path"`
+	} `json:"dedup"`
+	HTTP struct {
+		Addr string `json:"addr"`
+	} `json:"http"`
+	Scheduler struct {
+		IntervalSeconds int `json:"interval_seconds"`
+	} `json:"scheduler"`
+}
+
+func (f fileConfig) toConfig() Config {
+	cfg := Config{
+		RSSURL:          f.RSS.URL,
+		RSSURLs:         f.RSS.URLs,
+		AIEndpoint:      f.AI.Endpoint,
+		AIAPIKey:        f.AI.APIKey,
+		AIModel:         f.AI.Model,
+		WebhookURL:      f.Webhook.URL,
+		SendEmptyReport: f.Webhook.SendEmptyReport,
+		StorageDir:      f.Storage.Dir,
+		HTTPAddr:        f.HTTP.Addr,
+		DedupStorePath:  f.Dedup.StorePath,
+	}
+
+	if f.Scheduler.IntervalSeconds > 0 {
+		cfg.ScheduleInterval = time.Duration(f.Scheduler.IntervalSeconds) * time.Second
+	}
+
+	if len(cfg.RSSURLs) == 0 && cfg.RSSURL != "" {
+		cfg.RSSURLs = []string{cfg.RSSURL}
+	}
+
+	return cfg
 }
 
 func readDuration(name string, fallback time.Duration) time.Duration {
@@ -114,4 +253,14 @@ func splitList(value string) []string {
 	}
 
 	return result
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+
+	return ""
 }

@@ -22,7 +22,11 @@ import (
 )
 
 func main() {
-	cfg := config.LoadFromEnv()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	if err := run(context.Background(), cfg, os.Args[1:]); err != nil {
 		log.Fatal(err)
 	}
