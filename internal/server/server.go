@@ -17,7 +17,8 @@ type ReportRunner func(context.Context) (ReportResult, error)
 
 // ReportResult 表示一次日报生成结果摘要。
 type ReportResult struct {
-	ItemCount int `json:"item_count"`
+	ItemCount    int `json:"item_count"`
+	DisplayCount int `json:"display_count"`
 }
 
 // Options 保存 HTTP 服务选项。
@@ -46,8 +47,9 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Op
 		}
 
 		ctx.JSON(http.StatusOK, gin.H{
-			"status":     "generated",
-			"item_count": result.ItemCount,
+			"status":        "generated",
+			"item_count":    result.ItemCount,
+			"display_count": result.DisplayCount,
 		})
 	})
 

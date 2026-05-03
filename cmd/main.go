@@ -93,7 +93,10 @@ func runReportWithRepository(ctx context.Context, cfg config.Config, repo reposi
 		}
 	}
 
-	return server.ReportResult{ItemCount: len(sortedItems)}, nil
+	return server.ReportResult{
+		ItemCount:    len(sortedItems),
+		DisplayCount: len(displayItems),
+	}, nil
 }
 
 func runSchedule(ctx context.Context, cfg config.Config) error {
