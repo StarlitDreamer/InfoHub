@@ -1,0 +1,9 @@
+.git
+.idea
+.gocache
+data
+cmd/items
+cmd/reports
+*.exe
+*.test
+README.md

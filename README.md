@@ -142,6 +142,32 @@ data/dedup/seen.json
 
 这些运行数据默认被 `.gitignore` 忽略。
 
+## Docker 部署
+
+构建镜像：
+
+```bash
+docker build -t infohub-agent:local .
+```
+
+运行容器：
+
+```bash
+docker run --rm -p 8080:8080 \
+  -e INFOHUB_CONFIG_PATH=/app/configs/config.example.json \
+  -v "$(pwd)/configs/config.example.json:/app/configs/config.example.json:ro" \
+  -v "$(pwd)/data:/app/data" \
+  infohub-agent:local
+```
+
+使用 Docker Compose：
+
+```bash
+docker compose up --build
+```
+
+容器默认以 `serve` 模式启动，并监听 `:8080`。运行数据会写入挂载的 `./data` 目录。
+
 ## 去重行为
 
 系统会先做单次运行内标题去重，再做跨运行去重。跨运行去重 key 优先使用 URL；URL 为空时使用标题，并通过 SHA-256 生成稳定指纹。
@@ -173,4 +199,4 @@ INFOHUB_SEND_EMPTY_REPORT=true
 - 接入 Redis 版跨运行去重。
 - 接入 MySQL repository。
 - 增强 RSS 内容清洗和 HTML 摘要提取。
-- 增加 Dockerfile 和部署示例。
+- 增加生产环境反向代理和 HTTPS 示例。
