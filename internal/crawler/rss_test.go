@@ -18,11 +18,10 @@ func TestRSSCrawlerFetchesItems(t *testing.T) {
 
 	items, err := NewRSSCrawler(server.URL, server.Client(), RSSOptions{}).Fetch()
 	if err != nil {
-		t.Fatalf("采集 RSS 失败：%v", err)
+		t.Fatalf("fetch failed: %v", err)
 	}
-
 	if len(items) != 1 || items[0].Title != "标题一" {
-		t.Fatalf("RSS 解析结果不符合预期：%+v", items)
+		t.Fatalf("unexpected fetch result: %+v", items)
 	}
 }
 
@@ -36,19 +35,16 @@ func TestRSSCrawlerCleansHTMLDescription(t *testing.T) {
 
 	items, err := NewRSSCrawler(server.URL, server.Client(), RSSOptions{}).Fetch()
 	if err != nil {
-		t.Fatalf("采集 RSS 失败：%v", err)
+		t.Fatalf("fetch failed: %v", err)
 	}
-
 	if items[0].Title != "标题 一" {
-		t.Fatalf("标题清洗结果不符合预期：%q", items[0].Title)
+		t.Fatalf("unexpected cleaned title: %q", items[0].Title)
 	}
-
 	if items[0].Content != "摘要 & 内容" {
-		t.Fatalf("正文清洗结果不符合预期：%q", items[0].Content)
+		t.Fatalf("unexpected cleaned content: %q", items[0].Content)
 	}
-
 	if items[0].Source != "测试 源" {
-		t.Fatalf("来源清洗结果不符合预期：%q", items[0].Source)
+		t.Fatalf("unexpected cleaned source: %q", items[0].Source)
 	}
 }
 
@@ -73,14 +69,29 @@ func TestRSSCrawlerFiltersByRecentWindowAndMaxItems(t *testing.T) {
 		},
 	}).Fetch()
 	if err != nil {
-		t.Fatalf("采集 RSS 失败：%v", err)
+		t.Fatalf("fetch failed: %v", err)
 	}
-
 	if len(items) != 2 {
-		t.Fatalf("期望保留 2 条数据，实际为 %d", len(items))
+		t.Fatalf("expected 2 items after trimming, got %d", len(items))
+	}
+	if items[0].Title != "最新" || items[1].Title != "次新" {
+		t.Fatalf("unexpected filtered result: %+v", items)
+	}
+}
+
+func TestRSSCrawlerIncludesFeedURLInStatusErrors(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	_, err := NewRSSCrawler(server.URL, server.Client(), RSSOptions{}).Fetch()
+	if err == nil {
+		t.Fatal("expected fetch to fail")
 	}
 
-	if items[0].Title != "最新" || items[1].Title != "次新" {
-		t.Fatalf("过滤与排序结果不符合预期：%+v", items)
+	message := err.Error()
+	if !strings.Contains(message, server.URL) || !strings.Contains(message, "status code 404") {
+		t.Fatalf("expected url and status code in error, got %s", message)
 	}
 }

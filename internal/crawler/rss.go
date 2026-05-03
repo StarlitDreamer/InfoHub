@@ -38,26 +38,31 @@ func NewRSSCrawler(url string, client *http.Client, options RSSOptions) *RSSCraw
 	return &RSSCrawler{url: url, client: client, options: options}
 }
 
+// String 返回当前 RSS 源的标识，便于聚合错误归因。
+func (c *RSSCrawler) String() string {
+	return c.url
+}
+
 // Fetch 拉取并解析 RSS 数据。
 func (c *RSSCrawler) Fetch() ([]model.NewsItem, error) {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, c.url, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("build rss request for %s: %w", c.url, err)
 	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("request rss feed %s: %w", c.url, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("rss request failed, status code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("rss feed %s returned status code %d", c.url, resp.StatusCode)
 	}
 
 	var feed rssFeed
 	if err := xml.NewDecoder(resp.Body).Decode(&feed); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode rss feed %s: %w", c.url, err)
 	}
 
 	items := make([]model.NewsItem, 0, len(feed.Channel.Items))

@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"InfoHub-agent/internal/model"
@@ -15,37 +16,41 @@ func TestMultiCrawlerFetchesAllSuccessfulSources(t *testing.T) {
 
 	items, err := crawler.Fetch()
 	if err != nil {
-		t.Fatalf("多源采集失败：%v", err)
+		t.Fatalf("multi source fetch failed: %v", err)
 	}
-
 	if len(items) != 2 {
-		t.Fatalf("期望采集 2 条数据，实际为 %d", len(items))
+		t.Fatalf("expected 2 items, got %d", len(items))
 	}
 }
 
 func TestMultiCrawlerKeepsSuccessfulSourcesWhenSomeFail(t *testing.T) {
 	crawler := NewMultiCrawler([]Crawler{
-		errorCrawler{err: errors.New("采集失败")},
+		errorCrawler{label: "feed-a", err: errors.New("fetch failed")},
 		staticCrawler{items: []model.NewsItem{{Title: "成功数据"}}},
 	})
 
 	items, err := crawler.Fetch()
 	if err != nil {
-		t.Fatalf("部分失败时不应中断全部采集：%v", err)
+		t.Fatalf("expected partial failure to keep successful items: %v", err)
 	}
-
 	if len(items) != 1 || items[0].Title != "成功数据" {
-		t.Fatalf("部分失败采集结果不符合预期：%+v", items)
+		t.Fatalf("unexpected partial fetch result: %+v", items)
 	}
 }
 
-func TestMultiCrawlerReturnsErrorWhenAllSourcesFail(t *testing.T) {
+func TestMultiCrawlerReturnsSourceLabelsWhenAllSourcesFail(t *testing.T) {
 	crawler := NewMultiCrawler([]Crawler{
-		errorCrawler{err: errors.New("采集失败")},
+		errorCrawler{label: "feed-a", err: errors.New("fetch failed")},
+		errorCrawler{label: "feed-b", err: errors.New("timed out")},
 	})
 
-	if _, err := crawler.Fetch(); err == nil {
-		t.Fatal("期望所有数据源失败时返回错误")
+	_, err := crawler.Fetch()
+	if err == nil {
+		t.Fatal("expected error when all sources fail")
+	}
+	message := err.Error()
+	if !strings.Contains(message, "feed-a: fetch failed") || !strings.Contains(message, "feed-b: timed out") {
+		t.Fatalf("expected source labels in error, got %s", message)
 	}
 }
 
@@ -58,9 +63,14 @@ func (c staticCrawler) Fetch() ([]model.NewsItem, error) {
 }
 
 type errorCrawler struct {
-	err error
+	label string
+	err   error
 }
 
 func (c errorCrawler) Fetch() ([]model.NewsItem, error) {
 	return nil, c.err
+}
+
+func (c errorCrawler) String() string {
+	return c.label
 }

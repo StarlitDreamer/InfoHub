@@ -25,7 +25,7 @@ func (c *MultiCrawler) Fetch() ([]model.NewsItem, error) {
 	for index, crawler := range c.crawlers {
 		fetched, err := crawler.Fetch()
 		if err != nil {
-			messages = append(messages, fmt.Sprintf("source %d: %v", index+1, err))
+			messages = append(messages, fmt.Sprintf("%s: %v", sourceLabel(crawler, index), err))
 			continue
 		}
 
@@ -33,8 +33,19 @@ func (c *MultiCrawler) Fetch() ([]model.NewsItem, error) {
 	}
 
 	if len(items) == 0 && len(messages) > 0 {
-		return nil, fmt.Errorf("所有数据源采集失败：%s", strings.Join(messages, "; "))
+		return nil, fmt.Errorf("all sources failed: %s", strings.Join(messages, "; "))
 	}
 
 	return items, nil
+}
+
+func sourceLabel(crawler Crawler, index int) string {
+	if named, ok := crawler.(interface{ String() string }); ok {
+		label := strings.TrimSpace(named.String())
+		if label != "" {
+			return label
+		}
+	}
+
+	return fmt.Sprintf("source-%d", index+1)
 }
