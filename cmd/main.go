@@ -69,33 +69,25 @@ func runReportWithRepository(ctx context.Context, cfg config.Config, repo reposi
 		newCrawler(cfg),
 		newAIProcessor(cfg),
 	).WithDedupStore(newDedupStore(cfg))
-	items, err := pipeline.RunContext(ctx)
+	options := service.AgentOptions{
+		SendEmptyReport: cfg.SendEmptyReport,
+		ReportMaxItems:  cfg.ReportMaxItems,
+		Now:             timeNow,
+	}
+	if cfg.UseWebhook() {
+		options.WebhookSender = delivery.NewWebhookSender(cfg.WebhookURL, nil)
+	}
+
+	agent := service.NewAgent(pipeline, repo, options)
+	result, err := agent.Run(ctx)
 	if err != nil {
 		return server.ReportResult{}, err
 	}
 
-	sortedItems := service.SortByDecisionScore(items, timeNow())
-	displayItems := service.LimitItems(sortedItems, cfg.ReportMaxItems)
-	report := delivery.RenderMarkdown(displayItems)
-	fmt.Print(report)
-
-	if err := repo.Save(ctx, repository.ReportRecord{
-		GeneratedAt: timeNow(),
-		Markdown:    report,
-		Items:       sortedItems,
-	}); err != nil {
-		return server.ReportResult{}, err
-	}
-
-	if cfg.UseWebhook() && (len(items) > 0 || cfg.SendEmptyReport) {
-		if err := delivery.NewWebhookSender(cfg.WebhookURL, nil).Send(report); err != nil {
-			return server.ReportResult{}, err
-		}
-	}
-
+	fmt.Print(result.Markdown)
 	return server.ReportResult{
-		ItemCount:    len(sortedItems),
-		DisplayCount: len(displayItems),
+		ItemCount:    result.ItemCount,
+		DisplayCount: result.DisplayCount,
 	}, nil
 }
 
