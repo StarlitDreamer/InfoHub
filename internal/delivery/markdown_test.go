@@ -30,6 +30,9 @@ func TestRenderMarkdownIncludesOverviewAndDecisionFields(t *testing.T) {
 	if !strings.Contains(report, "- 收录条目：1") {
 		t.Fatal("expected markdown to include item count")
 	}
+	if !strings.Contains(report, "- 今日优先动作：") {
+		t.Fatal("expected markdown to include priority actions section")
+	}
 	if !strings.Contains(report, "## ⭐⭐⭐⭐ test title") {
 		t.Fatal("expected markdown to include scored item heading")
 	}
@@ -96,6 +99,21 @@ func TestRenderMarkdownOverviewSummarizesSourcesAndTopItems(t *testing.T) {
 	}
 	if !strings.Contains(report, "- 重点关注：alpha；beta；gamma") {
 		t.Fatalf("expected top item summary, got %s", report)
+	}
+}
+
+func TestSummarizePriorityActionsDeduplicates(t *testing.T) {
+	actions := summarizePriorityActions([]model.NewsItem{
+		{Title: "alpha", Score: 5},
+		{Title: "beta", Score: 5},
+		{Title: "gamma", Score: 3, Tags: []string{"AI"}},
+	}, 3)
+
+	if len(actions) != 2 {
+		t.Fatalf("expected deduplicated actions, got %+v", actions)
+	}
+	if !strings.Contains(actions[0], "优先安排评审") {
+		t.Fatalf("expected highest priority action first, got %+v", actions)
 	}
 }
 

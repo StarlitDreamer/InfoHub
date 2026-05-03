@@ -47,7 +47,17 @@ func renderOverview(builder *strings.Builder, items []model.NewsItem) {
 	builder.WriteString(fmt.Sprintf("- 收录条目：%d\n", len(items)))
 	builder.WriteString(fmt.Sprintf("- 高优先级：%d\n", countHighPriority(items)))
 	builder.WriteString(fmt.Sprintf("- 来源分布：%s\n", summarizeSources(items)))
-	builder.WriteString(fmt.Sprintf("- 重点关注：%s\n\n", summarizeTopTitles(items, 3)))
+	builder.WriteString(fmt.Sprintf("- 重点关注：%s\n", summarizeTopTitles(items, 3)))
+
+	actions := summarizePriorityActions(items, 3)
+	if len(actions) > 0 {
+		builder.WriteString("- 今日优先动作：\n")
+		for _, action := range actions {
+			builder.WriteString(fmt.Sprintf("  - %s\n", action))
+		}
+	}
+
+	builder.WriteString("\n")
 }
 
 func renderGroupedItems(builder *strings.Builder, items []model.NewsItem) {
@@ -73,6 +83,7 @@ func renderGroupedItems(builder *strings.Builder, items []model.NewsItem) {
 
 func renderItem(builder *strings.Builder, item model.NewsItem) {
 	summary := parseStructuredSummary(item)
+	action := recommendAction(item, summary)
 
 	builder.WriteString(fmt.Sprintf("## %s %s\n", scoreStars(item.Score), summary.Title))
 	builder.WriteString(fmt.Sprintf("- 标题：%s\n", summary.Title))
@@ -86,7 +97,7 @@ func renderItem(builder *strings.Builder, item model.NewsItem) {
 	builder.WriteString(fmt.Sprintf("- 发生了什么：%s\n", summary.WhatHappened))
 	builder.WriteString(fmt.Sprintf("- 为什么重要：%s\n", summary.WhyImportant))
 	builder.WriteString(fmt.Sprintf("- 影响：%s\n", summary.Impact))
-	builder.WriteString(fmt.Sprintf("- 建议动作：%s\n", recommendAction(item, summary)))
+	builder.WriteString(fmt.Sprintf("- 建议动作：%s\n", action))
 	builder.WriteString(fmt.Sprintf("- 评分：%.0f/5\n", clampScore(item.Score)))
 	if item.URL != "" {
 		builder.WriteString(fmt.Sprintf("- 原文链接：%s\n", item.URL))
@@ -151,6 +162,28 @@ func recommendAction(item model.NewsItem, summary structuredSummary) string {
 	default:
 		return "先纳入观察列表，等待更多上下文后再决定是否升级处理。"
 	}
+}
+
+func summarizePriorityActions(items []model.NewsItem, limit int) []string {
+	if limit <= 0 {
+		limit = 1
+	}
+
+	actions := make([]string, 0, limit)
+	seen := make(map[string]struct{})
+	for _, item := range items {
+		action := recommendAction(item, parseStructuredSummary(item))
+		if _, ok := seen[action]; ok {
+			continue
+		}
+		seen[action] = struct{}{}
+		actions = append(actions, action)
+		if len(actions) == limit {
+			break
+		}
+	}
+
+	return actions
 }
 
 func countHighPriority(items []model.NewsItem) int {
