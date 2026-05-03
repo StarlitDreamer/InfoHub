@@ -2,6 +2,7 @@ package service
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"InfoHub-agent/internal/model"
@@ -11,7 +12,23 @@ import (
 func SortByDecisionScore(items []model.NewsItem, now time.Time) []model.NewsItem {
 	result := append([]model.NewsItem(nil), items...)
 	sort.SliceStable(result, func(i, j int) bool {
-		return decisionScore(result[i], now) > decisionScore(result[j], now)
+		left := result[i]
+		right := result[j]
+		leftScore := decisionScore(left, now)
+		rightScore := decisionScore(right, now)
+		if leftScore != rightScore {
+			return leftScore > rightScore
+		}
+		if !left.PublishTime.Equal(right.PublishTime) {
+			return left.PublishTime.After(right.PublishTime)
+		}
+		if left.Score != right.Score {
+			return left.Score > right.Score
+		}
+		if left.Title != right.Title {
+			return strings.Compare(left.Title, right.Title) < 0
+		}
+		return strings.Compare(left.URL, right.URL) < 0
 	})
 
 	return result

@@ -219,7 +219,7 @@ INFOHUB_REPORT_MAX_ITEMS=12 docker compose up --build
 
 This starts:
 
-- `mysql:8.4` on `localhost:3306`
+- `mysql:8.4` on `localhost:3307`
 - `redis:7` on `localhost:6379`
 - `infohub-agent` on `localhost:8080`
 
@@ -232,7 +232,7 @@ docker compose up -d mysql redis
 Default DSN on the host machine:
 
 ```text
-infohub:infohub@tcp(localhost:3306)/infohub?charset=utf8mb4&parseTime=true&loc=Local
+infohub:infohub@tcp(localhost:3307)/infohub?charset=utf8mb4&parseTime=true&loc=Local
 ```
 
 Default DSN inside Docker Compose:
@@ -251,6 +251,32 @@ The local RSS config also trims feed volume by default:
 - keep only items from the last `168` hours
 - keep at most `15` items per feed
 - render only the top `12` items in the Markdown report
+
+Because the default dedup store is persistent, repeated `POST /reports/run` calls may return:
+
+```json
+{
+  "status": "generated",
+  "item_count": 0,
+  "display_count": 0
+}
+```
+
+That usually means the crawler did not find any new unseen items, not that the endpoint failed.
+
+For a clean verification run against the Compose stack, execute a one-off command with a temporary dedup store path inside the container:
+
+```bash
+docker exec \
+  -e INFOHUB_CONFIG_PATH=/app/configs/config.local.json \
+  -e INFOHUB_REPORT_MAX_ITEMS=12 \
+  -e INFOHUB_DEDUP_STORE_PATH=/tmp/verify-seen.json \
+  -e INFOHUB_MYSQL_DSN="infohub:infohub@tcp(mysql:3306)/infohub?charset=utf8mb4&parseTime=true&loc=Local" \
+  -e INFOHUB_MYSQL_TABLE=reports \
+  infohub-agent /app/infohub-agent run-once
+```
+
+This keeps the normal runtime dedup state untouched while generating a fresh report for verification.
 
 ## Current limitations
 

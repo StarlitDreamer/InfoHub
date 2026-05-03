@@ -1,8 +1,9 @@
-// Package service 串联信息处理主业务流程。
 package service
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"InfoHub-agent/internal/ai"
 	"InfoHub-agent/internal/crawler"
@@ -53,7 +54,6 @@ func (p *Pipeline) RunContext(ctx context.Context) ([]model.NewsItem, error) {
 			if err != nil {
 				return nil, err
 			}
-
 			if seen {
 				continue
 			}
@@ -63,6 +63,7 @@ func (p *Pipeline) RunContext(ctx context.Context) ([]model.NewsItem, error) {
 		if err != nil {
 			return nil, err
 		}
+		summarized = normalizeSummary(item, summarized)
 
 		if p.dedup != nil {
 			if err := p.dedup.Mark(ctx, processor.DedupKey(item)); err != nil {
@@ -74,4 +75,54 @@ func (p *Pipeline) RunContext(ctx context.Context) ([]model.NewsItem, error) {
 	}
 
 	return result, nil
+}
+
+func normalizeSummary(original, summarized model.NewsItem) model.NewsItem {
+	summarized.Title = strings.TrimSpace(summarized.Title)
+	if summarized.Title == "" {
+		summarized.Title = original.Title
+	}
+
+	summarized.Content = strings.TrimSpace(summarized.Content)
+	if summarized.Content == "" {
+		summarized.Content = fallbackSummary(original, summarized.Score)
+	}
+
+	if summarized.Score < 1 {
+		summarized.Score = 1
+	}
+	if summarized.Score > 5 {
+		summarized.Score = 5
+	}
+
+	if summarized.Source == "" {
+		summarized.Source = original.Source
+	}
+	if summarized.URL == "" {
+		summarized.URL = original.URL
+	}
+	if summarized.PublishTime.IsZero() {
+		summarized.PublishTime = original.PublishTime
+	}
+
+	return summarized
+}
+
+func fallbackSummary(item model.NewsItem, score float64) string {
+	normalizedScore := score
+	if normalizedScore < 1 || normalizedScore > 5 {
+		normalizedScore = 1
+	}
+
+	content := strings.TrimSpace(item.Content)
+	if content == "" {
+		content = item.Title
+	}
+
+	return fmt.Sprintf(
+		"【标题】%s\n【发生了什么】%s\n【为什么重要】该信息可能影响后续技术选型或行动判断。\n【影响】建议持续关注相关进展。\n【评分】%.0f",
+		item.Title,
+		content,
+		normalizedScore,
+	)
 }

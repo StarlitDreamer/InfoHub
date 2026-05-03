@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -76,6 +77,34 @@ func TestLatestReport(t *testing.T) {
 	}
 }
 
+func TestLatestReportReturnsNotFoundWhenRepositoryIsEmpty(t *testing.T) {
+	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
+		return ReportResult{}, nil
+	}, Options{})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/reports/latest", nil)
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", recorder.Code)
+	}
+}
+
+func TestRunReportReturnsErrorWhenRunnerFails(t *testing.T) {
+	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
+		return ReportResult{}, errors.New("boom")
+	}, Options{})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/reports/run", nil)
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", recorder.Code)
+	}
+}
+
 func TestAuthRequiredWhenTokenConfigured(t *testing.T) {
 	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
 		return ReportResult{}, nil
@@ -143,6 +172,37 @@ func TestReportsListIncludesSummaryCounts(t *testing.T) {
 	body := recorder.Body.String()
 	if !strings.Contains(body, `"item_count":2`) || !strings.Contains(body, `"display_count":1`) {
 		t.Fatalf("expected reports list to include summary counts, got %s", body)
+	}
+}
+
+func TestReportsListKeepsItemCountAndDisplayCountIndependent(t *testing.T) {
+	repo := newMemoryRepository()
+	repo.records = []repository.ReportRecord{
+		{
+			GeneratedAt: time.Date(2026, 5, 3, 16, 0, 0, 0, time.UTC),
+			Markdown:    "# report\n\n## item one\nbody\n\n## item two\nbody\n",
+			Items: []model.NewsItem{
+				{Title: "one"},
+				{Title: "two"},
+				{Title: "three"},
+				{Title: "four"},
+			},
+		},
+	}
+	router := NewRouter(repo, func(context.Context) (ReportResult, error) {
+		return ReportResult{}, nil
+	}, Options{})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/reports", nil)
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, `"item_count":4`) || !strings.Contains(body, `"display_count":2`) {
+		t.Fatalf("expected list response to preserve independent counts, got %s", body)
 	}
 }
 

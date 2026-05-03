@@ -38,3 +38,17 @@ func TestLimitItems(t *testing.T) {
 		t.Fatal("expected LimitItems to return a copy")
 	}
 }
+
+func TestSortByDecisionScoreUsesStableTieBreakers(t *testing.T) {
+	now := time.Date(2026, 5, 3, 12, 0, 0, 0, time.UTC)
+	items := []model.NewsItem{
+		{Title: "b", URL: "https://example.com/b", Score: 3, PublishTime: now},
+		{Title: "a", URL: "https://example.com/a", Score: 3, PublishTime: now},
+	}
+
+	result := SortByDecisionScore(items, now)
+
+	if result[0].Title != "a" {
+		t.Fatalf("expected title-based tie breaker to put a first, got %s", result[0].Title)
+	}
+}
