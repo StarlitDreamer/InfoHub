@@ -1,8 +1,26 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+
+	"InfoHub-agent/internal/ai"
+	"InfoHub-agent/internal/crawler"
+	"InfoHub-agent/internal/delivery"
+	"InfoHub-agent/internal/service"
+)
 
 func main() {
-	// 输出基础启动信息，便于验证项目入口可正常运行。
-	fmt.Println("InfoHub Agent started")
+	// 初始化 MVP 主流程组件，并输出 Markdown 日报。
+	pipeline := service.NewPipeline(
+		crawler.NewDemoCrawler(),
+		ai.NewMockProcessor(),
+	)
+
+	items, err := pipeline.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Print(delivery.RenderMarkdown(items))
 }
