@@ -12,6 +12,7 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("INFOHUB_AI_MODEL", "test-model")
 	t.Setenv("INFOHUB_WEBHOOK_URL", "https://example.com/webhook")
 	t.Setenv("INFOHUB_SCHEDULE_INTERVAL_SECONDS", "120")
+	t.Setenv("INFOHUB_STORAGE_DIR", "tmp/reports")
 
 	cfg := LoadFromEnv()
 
@@ -30,6 +31,10 @@ func TestLoadFromEnv(t *testing.T) {
 	if cfg.ScheduleInterval != 120*time.Second {
 		t.Fatalf("期望调度间隔为 120 秒，实际为 %s", cfg.ScheduleInterval)
 	}
+
+	if cfg.StorageDir != "tmp/reports" {
+		t.Fatalf("期望存储目录为 tmp/reports，实际为 %s", cfg.StorageDir)
+	}
 }
 
 func TestLoadFromEnvUsesFallbackInterval(t *testing.T) {
@@ -39,5 +44,9 @@ func TestLoadFromEnvUsesFallbackInterval(t *testing.T) {
 
 	if cfg.ScheduleInterval != defaultScheduleInterval {
 		t.Fatalf("期望使用默认调度间隔，实际为 %s", cfg.ScheduleInterval)
+	}
+
+	if cfg.StorageDir != defaultStorageDir {
+		t.Fatalf("期望使用默认存储目录，实际为 %s", cfg.StorageDir)
 	}
 }

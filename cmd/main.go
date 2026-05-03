@@ -8,11 +8,13 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"InfoHub-agent/internal/ai"
 	"InfoHub-agent/internal/config"
 	"InfoHub-agent/internal/crawler"
 	"InfoHub-agent/internal/delivery"
+	"InfoHub-agent/internal/repository"
 	"InfoHub-agent/internal/scheduler"
 	"InfoHub-agent/internal/service"
 )
@@ -32,7 +34,7 @@ func run(ctx context.Context, cfg config.Config, args []string) error {
 
 	switch mode {
 	case "run-once":
-		return runReport(cfg)
+		return runReport(ctx, cfg)
 	case "schedule":
 		return runSchedule(ctx, cfg)
 	default:
@@ -40,7 +42,7 @@ func run(ctx context.Context, cfg config.Config, args []string) error {
 	}
 }
 
-func runReport(cfg config.Config) error {
+func runReport(ctx context.Context, cfg config.Config) error {
 	// 根据运行配置选择真实链路或本地演示链路。
 	pipeline := service.NewPipeline(newCrawler(cfg), newAIProcessor(cfg))
 	items, err := pipeline.Run()
@@ -50,6 +52,15 @@ func runReport(cfg config.Config) error {
 
 	report := delivery.RenderMarkdown(items)
 	fmt.Print(report)
+
+	repo := repository.NewFileReportRepository(cfg.StorageDir)
+	if err := repo.Save(ctx, repository.ReportRecord{
+		GeneratedAt: timeNow(),
+		Markdown:    report,
+		Items:       items,
+	}); err != nil {
+		return err
+	}
 
 	if cfg.UseWebhook() {
 		if err := delivery.NewWebhookSender(cfg.WebhookURL, nil).Send(report); err != nil {
@@ -65,7 +76,7 @@ func runSchedule(ctx context.Context, cfg config.Config) error {
 	defer stop()
 
 	job := func(context.Context) error {
-		return runReport(cfg)
+		return runReport(ctx, cfg)
 	}
 	task := scheduler.New(cfg.ScheduleInterval, job)
 
@@ -82,6 +93,10 @@ func runSchedule(ctx context.Context, cfg config.Config) error {
 	}
 
 	return nil
+}
+
+var timeNow = func() time.Time {
+	return time.Now()
 }
 
 func newCrawler(cfg config.Config) crawler.Crawler {

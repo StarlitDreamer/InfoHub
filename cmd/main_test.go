@@ -17,7 +17,10 @@ func TestRunRejectsUnknownMode(t *testing.T) {
 }
 
 func TestRunOnceMode(t *testing.T) {
-	cfg := config.Config{ScheduleInterval: time.Hour}
+	cfg := config.Config{
+		ScheduleInterval: time.Hour,
+		StorageDir:       t.TempDir(),
+	}
 
 	if err := run(context.Background(), cfg, []string{"run-once"}); err != nil {
 		t.Fatalf("run-once 执行失败：%v", err)

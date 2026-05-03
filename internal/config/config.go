@@ -8,6 +8,7 @@ import (
 )
 
 const defaultScheduleInterval = time.Hour
+const defaultStorageDir = "data/reports"
 
 // Config 保存信息汇总 Agent 的运行配置。
 type Config struct {
@@ -17,6 +18,7 @@ type Config struct {
 	AIModel          string
 	WebhookURL       string
 	ScheduleInterval time.Duration
+	StorageDir       string
 }
 
 // LoadFromEnv 从环境变量加载配置。
@@ -28,6 +30,7 @@ func LoadFromEnv() Config {
 		AIModel:          os.Getenv("INFOHUB_AI_MODEL"),
 		WebhookURL:       os.Getenv("INFOHUB_WEBHOOK_URL"),
 		ScheduleInterval: readDuration("INFOHUB_SCHEDULE_INTERVAL_SECONDS", defaultScheduleInterval),
+		StorageDir:       readString("INFOHUB_STORAGE_DIR", defaultStorageDir),
 	}
 }
 
@@ -58,4 +61,13 @@ func readDuration(name string, fallback time.Duration) time.Duration {
 	}
 
 	return time.Duration(seconds) * time.Second
+}
+
+func readString(name, fallback string) string {
+	value := os.Getenv(name)
+	if value == "" {
+		return fallback
+	}
+
+	return value
 }

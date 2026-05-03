@@ -1,2 +1,5 @@
 .idea/
 .gocache/
+data/
+cmd/items/
+cmd/reports/
