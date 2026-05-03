@@ -44,13 +44,12 @@ func (p *Pipeline) RunContext(ctx context.Context) ([]model.NewsItem, error) {
 		return nil, err
 	}
 
-	items = processor.DeduplicateByTitle(items)
+	items = processor.DeduplicateItems(items)
 	result := make([]model.NewsItem, 0, len(items))
 
 	for _, item := range items {
 		if p.dedup != nil {
-			key := processor.DedupKey(item)
-			seen, err := p.dedup.Seen(ctx, key)
+			seen, err := hasSeenAnyDedupKey(ctx, p.dedup, item)
 			if err != nil {
 				return nil, err
 			}
@@ -66,7 +65,7 @@ func (p *Pipeline) RunContext(ctx context.Context) ([]model.NewsItem, error) {
 		summarized = normalizeSummary(item, summarized)
 
 		if p.dedup != nil {
-			if err := p.dedup.Mark(ctx, processor.DedupKey(item)); err != nil {
+			if err := markAllDedupKeys(ctx, p.dedup, item); err != nil {
 				return nil, err
 			}
 		}
@@ -75,6 +74,30 @@ func (p *Pipeline) RunContext(ctx context.Context) ([]model.NewsItem, error) {
 	}
 
 	return result, nil
+}
+
+func hasSeenAnyDedupKey(ctx context.Context, store processor.DedupStore, item model.NewsItem) (bool, error) {
+	for _, key := range processor.DedupKeys(item) {
+		seen, err := store.Seen(ctx, key)
+		if err != nil {
+			return false, err
+		}
+		if seen {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func markAllDedupKeys(ctx context.Context, store processor.DedupStore, item model.NewsItem) error {
+	for _, key := range processor.DedupKeys(item) {
+		if err := store.Mark(ctx, key); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func normalizeSummary(original, summarized model.NewsItem) model.NewsItem {

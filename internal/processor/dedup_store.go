@@ -58,15 +58,54 @@ func (s *FileDedupStore) Mark(ctx context.Context, key string) error {
 	return s.write(keys)
 }
 
-// DedupKey 生成稳定去重 key，优先使用 URL，URL 为空时使用标题。
-func DedupKey(item model.NewsItem) string {
-	value := strings.TrimSpace(item.URL)
-	if value == "" {
-		value = strings.TrimSpace(item.Title)
+// DedupKeys 生成多维度去重 key，覆盖标题、URL 和正文指纹。
+func DedupKeys(item model.NewsItem) []string {
+	keys := make([]string, 0, 3)
+
+	if value := normalizeDedupText(item.Title); value != "" {
+		keys = append(keys, hashDedupValue("title", value))
+	}
+	if value := normalizeDedupURL(item.URL); value != "" {
+		keys = append(keys, hashDedupValue("url", value))
+	}
+	if value := normalizeDedupText(item.Content); value != "" {
+		keys = append(keys, hashDedupValue("content", value))
 	}
 
-	sum := sha256.Sum256([]byte(strings.ToLower(value)))
-	return hex.EncodeToString(sum[:])
+	return keys
+}
+
+// DedupKey 保留单 key 接口，优先返回 URL，其次标题，最后正文指纹。
+func DedupKey(item model.NewsItem) string {
+	keys := DedupKeys(item)
+	for _, prefix := range []string{"url:", "title:", "content:"} {
+		for _, key := range keys {
+			if strings.HasPrefix(key, prefix) {
+				return key
+			}
+		}
+	}
+
+	return ""
+}
+
+func normalizeDedupURL(value string) string {
+	value = normalizeDedupText(value)
+	return strings.TrimRight(value, "/")
+}
+
+func normalizeDedupText(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return ""
+	}
+
+	return strings.Join(strings.Fields(value), " ")
+}
+
+func hashDedupValue(kind, value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return kind + ":" + hex.EncodeToString(sum[:])
 }
 
 func (s *FileDedupStore) read() (map[string]struct{}, error) {
@@ -97,7 +136,7 @@ func (s *FileDedupStore) read() (map[string]struct{}, error) {
 }
 
 func (s *FileDedupStore) write(keys map[string]struct{}) error {
-	if err := os.MkdirAll(filepath.Dir(s.path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
 		return err
 	}
 
@@ -111,5 +150,5 @@ func (s *FileDedupStore) write(keys map[string]struct{}) error {
 		return err
 	}
 
-	return os.WriteFile(s.path, content, 0644)
+	return os.WriteFile(s.path, content, 0o644)
 }
