@@ -186,6 +186,22 @@ func TestBuildAgentRequestFallsBackToDemoSource(t *testing.T) {
 	}
 }
 
+func TestBuildAgentRequestPrefersExplicitSources(t *testing.T) {
+	request := buildAgentRequest(config.Config{
+		Sources: []config.SourceConfig{
+			{Name: "custom-demo", Kind: "demo", Location: "memory://custom"},
+		},
+		RSSURLs: []string{"https://example.com/a.xml"},
+	}, "manual")
+
+	if len(request.Context.Sources) != 1 {
+		t.Fatalf("expected 1 source, got %d", len(request.Context.Sources))
+	}
+	if request.Context.Sources[0].Name != "custom-demo" || request.Context.Sources[0].Location != "memory://custom" {
+		t.Fatalf("expected explicit source to be used, got %+v", request.Context.Sources[0])
+	}
+}
+
 type captureReportRepository struct {
 	saveCalls int
 	record    repository.ReportRecord

@@ -84,6 +84,9 @@ func TestLoadFromEnvFallsBackToSingleRSSURL(t *testing.T) {
 	if len(cfg.RSSURLs) != 1 || cfg.RSSURLs[0] != "https://example.com/rss.xml" {
 		t.Fatalf("expected single RSS URL fallback, got %+v", cfg.RSSURLs)
 	}
+	if len(cfg.SourcesOrDefault()) != 1 || cfg.SourcesOrDefault()[0].Kind != "rss" {
+		t.Fatalf("expected rss source fallback, got %+v", cfg.SourcesOrDefault())
+	}
 }
 
 func TestLoadFromEnvUsesFallbackInterval(t *testing.T) {
@@ -114,6 +117,7 @@ func TestLoadFromEnvUsesFallbackInterval(t *testing.T) {
 func TestLoadFromJSONFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	content := `{
+  "sources": [{"name": "primary", "kind": "rss", "location": "https://example.com/source.xml"}],
   "rss": {"urls": ["https://example.com/a.xml", "https://example.com/b.xml"], "max_items_per_feed": 10, "recent_within_hours": 48},
   "report": {"max_items": 15},
   "ai": {"endpoint": "https://api.example.com/v1/chat/completions", "api_key": "file-key", "model": "file-model"},
@@ -139,6 +143,9 @@ func TestLoadFromJSONFile(t *testing.T) {
 	if len(cfg.RSSURLs) != 2 {
 		t.Fatalf("expected 2 RSS urls, got %d", len(cfg.RSSURLs))
 	}
+	if len(cfg.Sources) != 1 || cfg.Sources[0].Name != "primary" {
+		t.Fatalf("expected explicit sources config, got %+v", cfg.Sources)
+	}
 	if cfg.RSSMaxItems != 10 || cfg.RSSRecentWithin != 48*time.Hour || cfg.ReportMaxItems != 15 {
 		t.Fatalf("unexpected RSS trimming config: %+v", cfg)
 	}
@@ -156,6 +163,29 @@ func TestLoadFromJSONFile(t *testing.T) {
 	}
 	if cfg.MySQLDSN != "user:pass@tcp(mysql:3306)/infohub?parseTime=true" || cfg.MySQLTable != "report_records" {
 		t.Fatalf("unexpected MySQL config: %+v", cfg)
+	}
+}
+
+func TestSourcesOrDefaultPrefersExplicitSources(t *testing.T) {
+	cfg := Config{
+		Sources: []SourceConfig{
+			{Name: "demo-source", Kind: "demo", Location: "in-memory"},
+		},
+		RSSURLs: []string{"https://example.com/a.xml"},
+	}
+
+	sources := cfg.SourcesOrDefault()
+
+	if len(sources) != 1 || sources[0].Kind != "demo" {
+		t.Fatalf("expected explicit sources to win, got %+v", sources)
+	}
+}
+
+func TestSourcesOrDefaultFallsBackToDemo(t *testing.T) {
+	sources := (Config{}).SourcesOrDefault()
+
+	if len(sources) != 1 || sources[0].Kind != "demo" {
+		t.Fatalf("expected demo fallback, got %+v", sources)
 	}
 }
 

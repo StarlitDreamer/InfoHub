@@ -19,6 +19,7 @@ const defaultMySQLTable = "reports"
 
 // Config 保存信息汇总 Agent 的运行配置。
 type Config struct {
+	Sources          []SourceConfig
 	RSSURL           string
 	RSSURLs          []string
 	RSSMaxItems      int
@@ -40,6 +41,13 @@ type Config struct {
 	RedisDedupKey    string
 	MySQLDSN         string
 	MySQLTable       string
+}
+
+// SourceConfig 定义一个可执行的数据源配置。
+type SourceConfig struct {
+	Name     string
+	Kind     string
+	Location string
 }
 
 // Load 先读取 JSON 配置文件，再使用环境变量覆盖。
@@ -66,6 +74,40 @@ func LoadFromEnv() Config {
 // UseRSS 判断是否启用真实 RSS 数据源。
 func (c Config) UseRSS() bool {
 	return len(c.RSSURLs) > 0
+}
+
+// SourcesOrDefault 返回显式 source 配置；如果未提供，则兼容旧 RSS 配置。
+func (c Config) SourcesOrDefault() []SourceConfig {
+	if len(c.Sources) > 0 {
+		result := make([]SourceConfig, 0, len(c.Sources))
+		for _, source := range c.Sources {
+			if source.Kind == "" || source.Location == "" {
+				continue
+			}
+			result = append(result, source)
+		}
+		if len(result) > 0 {
+			return result
+		}
+	}
+
+	if len(c.RSSURLs) > 0 {
+		result := make([]SourceConfig, 0, len(c.RSSURLs))
+		for _, url := range c.RSSURLs {
+			result = append(result, SourceConfig{
+				Name:     url,
+				Kind:     "rss",
+				Location: url,
+			})
+		}
+		return result
+	}
+
+	return []SourceConfig{{
+		Name:     "demo",
+		Kind:     "demo",
+		Location: "in-memory",
+	}}
 }
 
 // UseRealAI 判断是否启用真实 AI 客户端。
@@ -110,6 +152,9 @@ func loadFromFile(path string) (Config, error) {
 }
 
 func mergeConfig(base, override Config) Config {
+	if len(override.Sources) > 0 {
+		base.Sources = override.Sources
+	}
 	if override.RSSURL != "" {
 		base.RSSURL = override.RSSURL
 	}
@@ -207,7 +252,8 @@ func applyEnv(cfg Config) Config {
 }
 
 type fileConfig struct {
-	RSS struct {
+	Sources []sourceFileConfig `json:"sources"`
+	RSS     struct {
 		URL               string   `json:"url"`
 		URLs              []string `json:"urls"`
 		MaxItemsPerFeed   int      `json:"max_items_per_feed"`
@@ -252,8 +298,15 @@ type fileConfig struct {
 	} `json:"scheduler"`
 }
 
+type sourceFileConfig struct {
+	Name     string `json:"name"`
+	Kind     string `json:"kind"`
+	Location string `json:"location"`
+}
+
 func (f fileConfig) toConfig() Config {
 	cfg := Config{
+		Sources:         make([]SourceConfig, 0, len(f.Sources)),
 		RSSURL:          f.RSS.URL,
 		RSSURLs:         f.RSS.URLs,
 		RSSMaxItems:     f.RSS.MaxItemsPerFeed,
@@ -273,6 +326,13 @@ func (f fileConfig) toConfig() Config {
 		MySQLDSN:        f.MySQL.DSN,
 		MySQLTable:      firstNonEmpty(f.MySQL.Table, defaultMySQLTable),
 		ReportMaxItems:  f.Report.MaxItems,
+	}
+	for _, source := range f.Sources {
+		cfg.Sources = append(cfg.Sources, SourceConfig{
+			Name:     source.Name,
+			Kind:     source.Kind,
+			Location: source.Location,
+		})
 	}
 
 	if f.Scheduler.IntervalSeconds > 0 {

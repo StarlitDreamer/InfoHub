@@ -135,23 +135,29 @@ var timeNow = func() time.Time {
 }
 
 func newCrawler(cfg config.Config) crawler.Crawler {
-	if cfg.UseRSS() {
-		crawlers := make([]crawler.Crawler, 0, len(cfg.RSSURLs))
-		for _, url := range cfg.RSSURLs {
-			crawlers = append(crawlers, crawler.NewRSSCrawler(url, nil, crawler.RSSOptions{
+	sources := cfg.SourcesOrDefault()
+	crawlers := make([]crawler.Crawler, 0, len(sources))
+
+	for _, source := range sources {
+		switch source.Kind {
+		case "rss":
+			crawlers = append(crawlers, crawler.NewRSSCrawler(source.Location, nil, crawler.RSSOptions{
 				MaxItems:     cfg.RSSMaxItems,
 				RecentWithin: cfg.RSSRecentWithin,
 			}))
+		case "demo":
+			crawlers = append(crawlers, crawler.NewDemoCrawler())
 		}
-
-		if len(crawlers) == 1 {
-			return crawlers[0]
-		}
-
-		return crawler.NewMultiCrawler(crawlers)
 	}
 
-	return crawler.NewDemoCrawler()
+	if len(crawlers) == 0 {
+		return crawler.NewDemoCrawler()
+	}
+	if len(crawlers) == 1 {
+		return crawlers[0]
+	}
+
+	return crawler.NewMultiCrawler(crawlers)
 }
 
 func newAIProcessor(cfg config.Config) ai.Processor {
@@ -163,20 +169,13 @@ func newAIProcessor(cfg config.Config) ai.Processor {
 }
 
 func buildAgentRequest(cfg config.Config, trigger string) service.AgentRequest {
-	sources := make([]service.Source, 0, len(cfg.RSSURLs))
-	if cfg.UseRSS() {
-		for _, url := range cfg.RSSURLs {
-			sources = append(sources, service.Source{
-				Name:     url,
-				Kind:     "rss",
-				Location: url,
-			})
-		}
-	} else {
+	configuredSources := cfg.SourcesOrDefault()
+	sources := make([]service.Source, 0, len(configuredSources))
+	for _, source := range configuredSources {
 		sources = append(sources, service.Source{
-			Name:     "demo",
-			Kind:     "demo",
-			Location: "in-memory",
+			Name:     source.Name,
+			Kind:     source.Kind,
+			Location: source.Location,
 		})
 	}
 
