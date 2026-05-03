@@ -98,6 +98,39 @@ func TestPipelineDeduplicatesWithinRunUsingCompositeFingerprints(t *testing.T) {
 	}
 }
 
+func TestPipelineFillsTagsSummaryAndScoreFromAI(t *testing.T) {
+	item := model.NewsItem{
+		Title:       "test title",
+		Content:     "original content",
+		Source:      "test source",
+		URL:         "https://example.com/a",
+		PublishTime: time.Date(2026, 5, 3, 12, 0, 0, 0, time.UTC),
+	}
+	pipeline := NewPipeline(
+		staticServiceCrawler{items: []model.NewsItem{item}},
+		structuredAI{},
+	)
+
+	result, err := pipeline.RunContext(context.Background())
+	if err != nil {
+		t.Fatalf("pipeline run failed: %v", err)
+	}
+	if len(result) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(result))
+	}
+
+	summarized := result[0]
+	if len(summarized.Tags) != 2 || summarized.Tags[0] != "AI" {
+		t.Fatalf("expected ai tags to be applied, got %+v", summarized.Tags)
+	}
+	if !strings.Contains(summarized.Content, "【标题】test title") {
+		t.Fatalf("expected structured summary from ai, got %s", summarized.Content)
+	}
+	if summarized.Score != 4 {
+		t.Fatalf("expected score from ai, got %v", summarized.Score)
+	}
+}
+
 func TestPipelineNormalizesEmptySummaryFields(t *testing.T) {
 	item := model.NewsItem{
 		Title:       "test title",
@@ -123,7 +156,7 @@ func TestPipelineNormalizesEmptySummaryFields(t *testing.T) {
 	if summarized.Title != item.Title {
 		t.Fatalf("expected title fallback to original title, got %s", summarized.Title)
 	}
-	if !strings.Contains(summarized.Content, "【标题】test title") {
+	if !strings.Contains(summarized.Content, "test title") {
 		t.Fatalf("expected fallback structured summary, got %s", summarized.Content)
 	}
 	if summarized.Score != 1 {
@@ -162,15 +195,42 @@ func (c staticServiceCrawler) Fetch() ([]model.NewsItem, error) {
 
 type echoAI struct{}
 
-func (a echoAI) Summarize(item model.NewsItem) (model.NewsItem, error) {
-	item.Score = 1
-	return item, nil
+func (a echoAI) Classify(item model.NewsItem) ([]string, error) {
+	return nil, nil
+}
+
+func (a echoAI) Summarize(item model.NewsItem) (string, error) {
+	return item.Content, nil
+}
+
+func (a echoAI) Score(item model.NewsItem) (float64, error) {
+	return 1, nil
+}
+
+type structuredAI struct{}
+
+func (a structuredAI) Classify(item model.NewsItem) ([]string, error) {
+	return []string{"AI", "News"}, nil
+}
+
+func (a structuredAI) Summarize(item model.NewsItem) (string, error) {
+	return "【标题】" + item.Title + "\n【发生了什么】summary\n【为什么重要】important\n【影响】impact\n【评分】4", nil
+}
+
+func (a structuredAI) Score(item model.NewsItem) (float64, error) {
+	return 4, nil
 }
 
 type emptyAI struct{}
 
-func (a emptyAI) Summarize(item model.NewsItem) (model.NewsItem, error) {
-	return model.NewsItem{
-		Score: 0,
-	}, nil
+func (a emptyAI) Classify(item model.NewsItem) ([]string, error) {
+	return nil, nil
+}
+
+func (a emptyAI) Summarize(item model.NewsItem) (string, error) {
+	return "", nil
+}
+
+func (a emptyAI) Score(item model.NewsItem) (float64, error) {
+	return 0, nil
 }

@@ -11,7 +11,7 @@ import (
 	"InfoHub-agent/internal/model"
 )
 
-// HTTPClient 调用 OpenAI 兼容接口生成真实摘要。
+// HTTPClient 调用 OpenAI 兼容接口生成真实分析结果。
 type HTTPClient struct {
 	endpoint string
 	apiKey   string
@@ -33,70 +33,146 @@ func NewHTTPClient(endpoint, apiKey, modelName string, client *http.Client) *HTT
 	}
 }
 
-// Summarize 调用真实模型并按项目要求回填摘要。
-func (c *HTTPClient) Summarize(item model.NewsItem) (model.NewsItem, error) {
+// Analyze 调用真实模型并返回分类、摘要和评分结果。
+func (c *HTTPClient) Analyze(item model.NewsItem) (Analysis, error) {
 	if c.endpoint == "" || c.apiKey == "" || c.model == "" {
-		return item, errors.New("AI 客户端缺少 endpoint、apiKey 或 model")
+		return Analysis{}, errors.New("ai client requires endpoint, api key, and model")
 	}
 
 	body, err := json.Marshal(chatRequest{
 		Model: c.model,
 		Messages: []chatMessage{
-			{Role: "system", Content: "你是信息汇总 Agent，请输出结构化摘要。"},
+			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: promptFor(item)},
+		},
+		ResponseFormat: &responseFormat{
+			Type: "json_object",
 		},
 	})
 	if err != nil {
-		return item, err
+		return Analysis{}, err
 	}
 
 	req, err := http.NewRequest(http.MethodPost, c.endpoint, bytes.NewReader(body))
 	if err != nil {
-		return item, err
+		return Analysis{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return item, err
+		return Analysis{}, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return item, fmt.Errorf("AI 请求失败，状态码：%d", resp.StatusCode)
+		return Analysis{}, fmt.Errorf("ai request failed with status %d", resp.StatusCode)
 	}
 
 	var result chatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return item, err
+		return Analysis{}, err
 	}
 	if len(result.Choices) == 0 {
-		return item, errors.New("AI 响应缺少 choices")
+		return Analysis{}, errors.New("ai response has no choices")
 	}
 
-	item.Content = strings.TrimSpace(result.Choices[0].Message.Content)
-	item.Score = extractScore(item.Content)
-	return item, nil
+	return parseAnalysis(result.Choices[0].Message.Content)
 }
+
+// Classify 返回标签。
+func (c *HTTPClient) Classify(item model.NewsItem) ([]string, error) {
+	analysis, err := c.Analyze(item)
+	if err != nil {
+		return nil, err
+	}
+
+	return analysis.Tags, nil
+}
+
+// Summarize 返回结构化摘要。
+func (c *HTTPClient) Summarize(item model.NewsItem) (string, error) {
+	analysis, err := c.Analyze(item)
+	if err != nil {
+		return "", err
+	}
+
+	return analysis.Summary, nil
+}
+
+// Score 返回评分。
+func (c *HTTPClient) Score(item model.NewsItem) (float64, error) {
+	analysis, err := c.Analyze(item)
+	if err != nil {
+		return 0, err
+	}
+
+	return analysis.Score, nil
+}
+
+const systemPrompt = "You are an information aggregation agent. Return JSON with keys tags, summary, and score. Summary must use the required Chinese labeled format."
 
 func promptFor(item model.NewsItem) string {
-	return fmt.Sprintf("总结以下内容：\n标题：%s\n内容：%s\n输出格式：\n【标题】\n【发生了什么】\n【为什么重要】\n【影响】\n【评分】1-5", item.Title, item.Content)
+	return fmt.Sprintf(
+		"Analyze the following content.\nTitle: %s\nContent: %s\nReturn JSON like {\"tags\":[...],\"summary\":\"...\",\"score\":1-5}.\nThe summary text must use this format:\n【标题】\n【发生了什么】\n【为什么重要】\n【影响】\n【评分】1-5",
+		item.Title,
+		item.Content,
+	)
 }
 
-func extractScore(content string) float64 {
-	for _, value := range []string{"5", "4", "3", "2", "1"} {
-		if strings.Contains(content, "【评分】"+value) || strings.Contains(content, "评分】"+value) {
-			return float64(value[0] - '0')
-		}
+func parseAnalysis(content string) (Analysis, error) {
+	var payload analysisPayload
+	if err := json.Unmarshal([]byte(strings.TrimSpace(content)), &payload); err != nil {
+		return Analysis{}, err
 	}
 
-	return 1
+	return Analysis{
+		Tags:    normalizeTags(payload.Tags),
+		Summary: strings.TrimSpace(payload.Summary),
+		Score:   clampScore(payload.Score),
+	}, nil
+}
+
+func normalizeTags(tags []string) []string {
+	result := make([]string, 0, len(tags))
+	seen := map[string]struct{}{}
+
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		key := strings.ToLower(tag)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, tag)
+	}
+
+	return result
+}
+
+func clampScore(score float64) float64 {
+	if score < 1 {
+		return 1
+	}
+	if score > 5 {
+		return 5
+	}
+
+	return score
 }
 
 type chatRequest struct {
-	Model    string        `json:"model"`
-	Messages []chatMessage `json:"messages"`
+	Model          string          `json:"model"`
+	Messages       []chatMessage   `json:"messages"`
+	ResponseFormat *responseFormat `json:"response_format,omitempty"`
+}
+
+type responseFormat struct {
+	Type string `json:"type"`
 }
 
 type chatMessage struct {
@@ -108,4 +184,10 @@ type chatResponse struct {
 	Choices []struct {
 		Message chatMessage `json:"message"`
 	} `json:"choices"`
+}
+
+type analysisPayload struct {
+	Tags    []string `json:"tags"`
+	Summary string   `json:"summary"`
+	Score   float64  `json:"score"`
 }

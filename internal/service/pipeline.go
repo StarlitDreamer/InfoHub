@@ -58,10 +58,14 @@ func (p *Pipeline) RunContext(ctx context.Context) ([]model.NewsItem, error) {
 			}
 		}
 
-		summarized, err := p.ai.Summarize(item)
+		analysis, err := ai.AnalyzeItem(p.ai, item)
 		if err != nil {
 			return nil, err
 		}
+		summarized := item
+		summarized.Tags = analysis.Tags
+		summarized.Content = analysis.Summary
+		summarized.Score = analysis.Score
 		summarized = normalizeSummary(item, summarized)
 
 		if p.dedup != nil {
