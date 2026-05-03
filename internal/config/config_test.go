@@ -13,6 +13,7 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("INFOHUB_WEBHOOK_URL", "https://example.com/webhook")
 	t.Setenv("INFOHUB_SCHEDULE_INTERVAL_SECONDS", "120")
 	t.Setenv("INFOHUB_STORAGE_DIR", "tmp/reports")
+	t.Setenv("INFOHUB_HTTP_ADDR", ":9090")
 
 	cfg := LoadFromEnv()
 
@@ -35,6 +36,10 @@ func TestLoadFromEnv(t *testing.T) {
 	if cfg.StorageDir != "tmp/reports" {
 		t.Fatalf("期望存储目录为 tmp/reports，实际为 %s", cfg.StorageDir)
 	}
+
+	if cfg.HTTPAddr != ":9090" {
+		t.Fatalf("期望 HTTP 地址为 :9090，实际为 %s", cfg.HTTPAddr)
+	}
 }
 
 func TestLoadFromEnvUsesFallbackInterval(t *testing.T) {
@@ -48,5 +53,9 @@ func TestLoadFromEnvUsesFallbackInterval(t *testing.T) {
 
 	if cfg.StorageDir != defaultStorageDir {
 		t.Fatalf("期望使用默认存储目录，实际为 %s", cfg.StorageDir)
+	}
+
+	if cfg.HTTPAddr != defaultHTTPAddr {
+		t.Fatalf("期望使用默认 HTTP 地址，实际为 %s", cfg.HTTPAddr)
 	}
 }

@@ -16,6 +16,7 @@ import (
 	"InfoHub-agent/internal/delivery"
 	"InfoHub-agent/internal/repository"
 	"InfoHub-agent/internal/scheduler"
+	"InfoHub-agent/internal/server"
 	"InfoHub-agent/internal/service"
 )
 
@@ -37,8 +38,10 @@ func run(ctx context.Context, cfg config.Config, args []string) error {
 		return runReport(ctx, cfg)
 	case "schedule":
 		return runSchedule(ctx, cfg)
+	case "serve":
+		return runServer(cfg)
 	default:
-		return fmt.Errorf("未知运行模式：%s，可用模式：run-once、schedule", mode)
+		return fmt.Errorf("未知运行模式：%s，可用模式：run-once、schedule、serve", mode)
 	}
 }
 
@@ -93,6 +96,15 @@ func runSchedule(ctx context.Context, cfg config.Config) error {
 	}
 
 	return nil
+}
+
+func runServer(cfg config.Config) error {
+	repo := repository.NewFileReportRepository(cfg.StorageDir)
+	router := server.NewRouter(repo, func(ctx context.Context) error {
+		return runReport(ctx, cfg)
+	})
+
+	return router.Run(cfg.HTTPAddr)
 }
 
 var timeNow = func() time.Time {

@@ -18,4 +18,14 @@ type ReportRecord struct {
 // ReportRepository 定义日报存储接口。
 type ReportRepository interface {
 	Save(ctx context.Context, record ReportRecord) error
+	Latest(ctx context.Context) (ReportRecord, error)
+	List(ctx context.Context) ([]ReportMetadata, error)
+}
+
+// ReportMetadata 表示历史日报的文件索引信息。
+type ReportMetadata struct {
+	Name      string    `json:"name"`
+	Markdown  string    `json:"markdown"`
+	Items     string    `json:"items"`
+	CreatedAt time.Time `json:"created_at"`
 }

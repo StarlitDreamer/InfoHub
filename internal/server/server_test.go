@@ -1,0 +1,95 @@
+package server
+
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"InfoHub-agent/internal/model"
+	"InfoHub-agent/internal/repository"
+)
+
+func TestHealth(t *testing.T) {
+	router := NewRouter(newMemoryRepository(), func(context.Context) error { return nil })
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/health", nil)
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("期望状态码 200，实际为 %d", recorder.Code)
+	}
+}
+
+func TestRunReport(t *testing.T) {
+	called := false
+	router := NewRouter(newMemoryRepository(), func(context.Context) error {
+		called = true
+		return nil
+	})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/reports/run", nil)
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("期望状态码 200，实际为 %d", recorder.Code)
+	}
+
+	if !called {
+		t.Fatal("期望日报生成任务被调用")
+	}
+}
+
+func TestLatestReport(t *testing.T) {
+	repo := newMemoryRepository()
+	_ = repo.Save(context.Background(), repository.ReportRecord{
+		GeneratedAt: time.Date(2026, 5, 3, 16, 0, 0, 0, time.UTC),
+		Markdown:    "# 今日信息",
+		Items:       []model.NewsItem{{Title: "测试"}},
+	})
+	router := NewRouter(repo, func(context.Context) error { return nil })
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/reports/latest", nil)
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("期望状态码 200，实际为 %d", recorder.Code)
+	}
+}
+
+type memoryRepository struct {
+	records []repository.ReportRecord
+}
+
+func newMemoryRepository() *memoryRepository {
+	return &memoryRepository{}
+}
+
+func (r *memoryRepository) Save(ctx context.Context, record repository.ReportRecord) error {
+	r.records = append(r.records, record)
+	return nil
+}
+
+func (r *memoryRepository) Latest(ctx context.Context) (repository.ReportRecord, error) {
+	if len(r.records) == 0 {
+		return repository.ReportRecord{}, repository.ErrReportNotFound
+	}
+
+	return r.records[len(r.records)-1], nil
+}
+
+func (r *memoryRepository) List(ctx context.Context) ([]repository.ReportMetadata, error) {
+	result := make([]repository.ReportMetadata, 0, len(r.records))
+	for _, record := range r.records {
+		result = append(result, repository.ReportMetadata{
+			Name:      record.GeneratedAt.Format("20060102-150405"),
+			CreatedAt: record.GeneratedAt,
+		})
+	}
+
+	return result, nil
+}
