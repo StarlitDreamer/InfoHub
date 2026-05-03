@@ -109,11 +109,24 @@ func (r *FileReportRepository) List(ctx context.Context) ([]ReportMetadata, erro
 			continue
 		}
 
+		markdownPath := filepath.Join(r.root, "reports", entry.Name())
+		itemsPath := filepath.Join(r.root, "items", name+".json")
+		markdownContent, err := os.ReadFile(markdownPath)
+		if err != nil {
+			return nil, err
+		}
+		items, err := readItems(itemsPath)
+		if err != nil {
+			return nil, err
+		}
+
 		records = append(records, ReportMetadata{
-			Name:      name,
-			Markdown:  filepath.ToSlash(filepath.Join("reports", entry.Name())),
-			Items:     filepath.ToSlash(filepath.Join("items", name+".json")),
-			CreatedAt: createdAt,
+			Name:         name,
+			Markdown:     filepath.ToSlash(filepath.Join("reports", entry.Name())),
+			Items:        filepath.ToSlash(filepath.Join("items", name+".json")),
+			ItemCount:    len(items),
+			DisplayCount: countDisplayItems(string(markdownContent)),
+			CreatedAt:    createdAt,
 		})
 	}
 

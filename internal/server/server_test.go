@@ -120,6 +120,32 @@ func TestAuthAcceptsBearerToken(t *testing.T) {
 	}
 }
 
+func TestReportsListIncludesSummaryCounts(t *testing.T) {
+	repo := newMemoryRepository()
+	repo.records = []repository.ReportRecord{
+		{
+			GeneratedAt: time.Date(2026, 5, 3, 16, 0, 0, 0, time.UTC),
+			Markdown:    "# 今日信息\n\n## ⭐⭐⭐\n- 标题：测试一\n- 摘要：摘要一\n",
+			Items:       []model.NewsItem{{Title: "测试一"}, {Title: "库存条目"}},
+		},
+	}
+	router := NewRouter(repo, func(context.Context) (ReportResult, error) {
+		return ReportResult{}, nil
+	}, Options{})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/reports", nil)
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, `"item_count":2`) || !strings.Contains(body, `"display_count":1`) {
+		t.Fatalf("expected reports list to include summary counts, got %s", body)
+	}
+}
+
 func TestHealthSkipsAuth(t *testing.T) {
 	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
 		return ReportResult{}, nil
@@ -158,9 +184,18 @@ func (r *memoryRepository) Latest(ctx context.Context) (repository.ReportRecord,
 func (r *memoryRepository) List(ctx context.Context) ([]repository.ReportMetadata, error) {
 	result := make([]repository.ReportMetadata, 0, len(r.records))
 	for _, record := range r.records {
+		displayCount := 0
+		for _, line := range strings.Split(record.Markdown, "\n") {
+			if strings.HasPrefix(line, "## ") {
+				displayCount++
+			}
+		}
+
 		result = append(result, repository.ReportMetadata{
-			Name:      record.GeneratedAt.Format("20060102-150405"),
-			CreatedAt: record.GeneratedAt,
+			Name:         record.GeneratedAt.Format("20060102-150405"),
+			ItemCount:    len(record.Items),
+			DisplayCount: displayCount,
+			CreatedAt:    record.GeneratedAt,
 		})
 	}
 

@@ -14,7 +14,7 @@ import (
 func TestNewMySQLReportRepositoryEnsuresTable(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
-		t.Fatalf("创建 sqlmock 失败：%v", err)
+		t.Fatalf("sqlmock new failed: %v", err)
 	}
 	defer db.Close()
 
@@ -23,22 +23,20 @@ func TestNewMySQLReportRepositoryEnsuresTable(t *testing.T) {
 
 	repo, err := NewMySQLReportRepository(db, "reports")
 	if err != nil {
-		t.Fatalf("创建 MySQL 仓储失败：%v", err)
+		t.Fatalf("create repository failed: %v", err)
 	}
-
 	if repo.table != "reports" {
-		t.Fatalf("期望表名为 reports，实际为 %s", repo.table)
+		t.Fatalf("expected table name reports, got %s", repo.table)
 	}
-
 	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatalf("未满足的 SQL 预期：%v", err)
+		t.Fatalf("unmet sql expectations: %v", err)
 	}
 }
 
 func TestMySQLReportRepositorySave(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
-		t.Fatalf("创建 sqlmock 失败：%v", err)
+		t.Fatalf("sqlmock new failed: %v", err)
 	}
 	defer db.Close()
 
@@ -47,7 +45,7 @@ func TestMySQLReportRepositorySave(t *testing.T) {
 
 	repo, err := NewMySQLReportRepository(db, "reports")
 	if err != nil {
-		t.Fatalf("创建 MySQL 仓储失败：%v", err)
+		t.Fatalf("create repository failed: %v", err)
 	}
 
 	generatedAt := time.Date(2026, 5, 3, 16, 0, 0, 0, time.FixedZone("CST", 8*3600))
@@ -61,18 +59,17 @@ func TestMySQLReportRepositorySave(t *testing.T) {
 		Items:       []model.NewsItem{{Title: "测试标题"}},
 	})
 	if err != nil {
-		t.Fatalf("保存日报失败：%v", err)
+		t.Fatalf("save failed: %v", err)
 	}
-
 	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatalf("未满足的 SQL 预期：%v", err)
+		t.Fatalf("unmet sql expectations: %v", err)
 	}
 }
 
 func TestMySQLReportRepositoryLatestAndList(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
-		t.Fatalf("创建 sqlmock 失败：%v", err)
+		t.Fatalf("sqlmock new failed: %v", err)
 	}
 	defer db.Close()
 
@@ -81,46 +78,47 @@ func TestMySQLReportRepositoryLatestAndList(t *testing.T) {
 
 	repo, err := NewMySQLReportRepository(db, "reports")
 	if err != nil {
-		t.Fatalf("创建 MySQL 仓储失败：%v", err)
+		t.Fatalf("create repository failed: %v", err)
 	}
 
 	latestTime := time.Date(2026, 5, 3, 16, 30, 0, 0, time.UTC)
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT generated_at, markdown, items_json FROM `reports` ORDER BY generated_at DESC, id DESC LIMIT 1")).
 		WillReturnRows(sqlmock.NewRows([]string{"generated_at", "markdown", "items_json"}).
-			AddRow(latestTime, "# 第二份日报", `[{"ID":0,"Title":"第二条","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0}]`))
+			AddRow(latestTime, "# 今日信息\n\n## ⭐⭐⭐\n- 标题：第二条\n- 摘要：摘要二\n", `[{"ID":0,"Title":"第二条","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0}]`))
 
 	record, err := repo.Latest(context.Background())
 	if err != nil {
-		t.Fatalf("读取最新日报失败：%v", err)
+		t.Fatalf("latest failed: %v", err)
+	}
+	if record.Markdown == "" || len(record.Items) != 1 || record.Items[0].Title != "第二条" {
+		t.Fatalf("unexpected latest record: %+v", record)
 	}
 
-	if record.Markdown != "# 第二份日报" || len(record.Items) != 1 || record.Items[0].Title != "第二条" {
-		t.Fatalf("最新日报内容不符合预期：%+v", record)
-	}
-
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT generated_at FROM `reports` ORDER BY generated_at DESC, id DESC")).
-		WillReturnRows(sqlmock.NewRows([]string{"generated_at"}).
-			AddRow(latestTime).
-			AddRow(time.Date(2026, 5, 3, 15, 30, 0, 0, time.UTC)))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT generated_at, markdown, items_json FROM `reports` ORDER BY generated_at DESC, id DESC")).
+		WillReturnRows(sqlmock.NewRows([]string{"generated_at", "markdown", "items_json"}).
+			AddRow(latestTime, "# 今日信息\n\n## ⭐⭐⭐\n- 标题：第二条\n- 摘要：摘要二\n\n## ⭐⭐\n- 标题：第三条\n- 摘要：摘要三\n", `[{"ID":0,"Title":"第二条","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0},{"ID":0,"Title":"第三条","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0},{"ID":0,"Title":"库存但未展示","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0}]`).
+			AddRow(time.Date(2026, 5, 3, 15, 30, 0, 0, time.UTC), "# 今日信息\n\n## ⭐⭐⭐\n- 标题：第一条\n- 摘要：摘要一\n", `[{"ID":0,"Title":"第一条","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0}]`))
 
 	records, err := repo.List(context.Background())
 	if err != nil {
-		t.Fatalf("读取日报列表失败：%v", err)
+		t.Fatalf("list failed: %v", err)
 	}
-
 	if len(records) != 2 || records[0].Name != "20260503-163000" {
-		t.Fatalf("日报列表不符合预期：%+v", records)
+		t.Fatalf("unexpected list order: %+v", records)
+	}
+	if records[0].ItemCount != 3 || records[0].DisplayCount != 2 {
+		t.Fatalf("unexpected list summary: %+v", records[0])
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatalf("未满足的 SQL 预期：%v", err)
+		t.Fatalf("unmet sql expectations: %v", err)
 	}
 }
 
 func TestMySQLReportRepositoryLatestReturnsNotFound(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
-		t.Fatalf("创建 sqlmock 失败：%v", err)
+		t.Fatalf("sqlmock new failed: %v", err)
 	}
 	defer db.Close()
 
@@ -129,7 +127,7 @@ func TestMySQLReportRepositoryLatestReturnsNotFound(t *testing.T) {
 
 	repo, err := NewMySQLReportRepository(db, "reports")
 	if err != nil {
-		t.Fatalf("创建 MySQL 仓储失败：%v", err)
+		t.Fatalf("create repository failed: %v", err)
 	}
 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT generated_at, markdown, items_json FROM `reports` ORDER BY generated_at DESC, id DESC LIMIT 1")).
@@ -137,10 +135,9 @@ func TestMySQLReportRepositoryLatestReturnsNotFound(t *testing.T) {
 
 	_, err = repo.Latest(context.Background())
 	if err != ErrReportNotFound {
-		t.Fatalf("期望返回 ErrReportNotFound，实际为 %v", err)
+		t.Fatalf("expected ErrReportNotFound, got %v", err)
 	}
-
 	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatalf("未满足的 SQL 预期：%v", err)
+		t.Fatalf("unmet sql expectations: %v", err)
 	}
 }

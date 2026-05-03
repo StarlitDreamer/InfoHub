@@ -94,7 +94,7 @@ func (r *MySQLReportRepository) List(ctx context.Context) ([]ReportMetadata, err
 	}
 
 	query := fmt.Sprintf(
-		"SELECT generated_at FROM `%s` ORDER BY generated_at DESC, id DESC",
+		"SELECT generated_at, markdown, items_json FROM `%s` ORDER BY generated_at DESC, id DESC",
 		r.table,
 	)
 
@@ -106,14 +106,25 @@ func (r *MySQLReportRepository) List(ctx context.Context) ([]ReportMetadata, err
 
 	records := make([]ReportMetadata, 0)
 	for rows.Next() {
-		var generatedAt time.Time
-		if err := rows.Scan(&generatedAt); err != nil {
+		var (
+			generatedAt time.Time
+			markdown    string
+			itemsJSON   string
+		)
+		if err := rows.Scan(&generatedAt, &markdown, &itemsJSON); err != nil {
+			return nil, err
+		}
+
+		items, err := decodeItemsJSON(itemsJSON)
+		if err != nil {
 			return nil, err
 		}
 
 		records = append(records, ReportMetadata{
-			Name:      generatedAt.UTC().Format("20060102-150405"),
-			CreatedAt: generatedAt,
+			Name:         generatedAt.UTC().Format("20060102-150405"),
+			ItemCount:    len(items),
+			DisplayCount: countDisplayItems(markdown),
+			CreatedAt:    generatedAt,
 		})
 	}
 

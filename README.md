@@ -148,6 +148,8 @@ List historical reports:
 GET /reports
 ```
 
+Each history entry includes `item_count` and `display_count` so clients can show report size without opening the full report.
+
 If `INFOHUB_AUTH_TOKEN` is configured, all endpoints except `/health` require:
 
 ```http

@@ -21,15 +21,14 @@ func TestFileReportRepositorySave(t *testing.T) {
 		Items:       []model.NewsItem{{Title: "测试标题"}},
 	})
 	if err != nil {
-		t.Fatalf("保存日报失败：%v", err)
+		t.Fatalf("save failed: %v", err)
 	}
 
 	if _, err := os.Stat(filepath.Join(root, "reports", "20260503-153000.md")); err != nil {
-		t.Fatalf("期望 Markdown 日报文件存在：%v", err)
+		t.Fatalf("expected markdown file to exist: %v", err)
 	}
-
 	if _, err := os.Stat(filepath.Join(root, "items", "20260503-153000.json")); err != nil {
-		t.Fatalf("期望 NewsItem JSON 文件存在：%v", err)
+		t.Fatalf("expected items file to exist: %v", err)
 	}
 }
 
@@ -40,37 +39,39 @@ func TestFileReportRepositoryLatestAndList(t *testing.T) {
 	records := []ReportRecord{
 		{
 			GeneratedAt: time.Date(2026, 5, 3, 15, 30, 0, 0, time.UTC),
-			Markdown:    "# 第一份日报",
+			Markdown:    "# 今日信息\n\n## ⭐⭐⭐\n- 标题：第一条\n- 摘要：摘要一\n",
 			Items:       []model.NewsItem{{Title: "第一条"}},
 		},
 		{
 			GeneratedAt: time.Date(2026, 5, 3, 16, 30, 0, 0, time.UTC),
-			Markdown:    "# 第二份日报",
-			Items:       []model.NewsItem{{Title: "第二条"}},
+			Markdown:    "# 今日信息\n\n## ⭐⭐⭐\n- 标题：第二条\n- 摘要：摘要二\n\n## ⭐⭐\n- 标题：第三条\n- 摘要：摘要三\n",
+			Items:       []model.NewsItem{{Title: "第二条"}, {Title: "第三条"}, {Title: "库存但未展示"}},
 		},
 	}
 
 	for _, record := range records {
 		if err := repo.Save(context.Background(), record); err != nil {
-			t.Fatalf("保存日报失败：%v", err)
+			t.Fatalf("save failed: %v", err)
 		}
 	}
 
 	list, err := repo.List(context.Background())
 	if err != nil {
-		t.Fatalf("读取日报列表失败：%v", err)
+		t.Fatalf("list failed: %v", err)
 	}
 
 	if len(list) != 2 || list[0].Name != "20260503-163000" {
-		t.Fatalf("日报列表排序不符合预期：%+v", list)
+		t.Fatalf("unexpected list order: %+v", list)
+	}
+	if list[0].ItemCount != 3 || list[0].DisplayCount != 2 {
+		t.Fatalf("unexpected list summary: %+v", list[0])
 	}
 
 	latest, err := repo.Latest(context.Background())
 	if err != nil {
-		t.Fatalf("读取最新日报失败：%v", err)
+		t.Fatalf("latest failed: %v", err)
 	}
-
-	if latest.Markdown != "# 第二份日报" {
-		t.Fatalf("期望读取第二份日报，实际为 %s", latest.Markdown)
+	if latest.Markdown != records[1].Markdown {
+		t.Fatalf("expected latest markdown to match second record, got %s", latest.Markdown)
 	}
 }

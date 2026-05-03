@@ -3,6 +3,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"InfoHub-agent/internal/model"
@@ -24,8 +25,21 @@ type ReportRepository interface {
 
 // ReportMetadata 表示历史日报的文件索引信息。
 type ReportMetadata struct {
-	Name      string    `json:"name"`
-	Markdown  string    `json:"markdown"`
-	Items     string    `json:"items"`
-	CreatedAt time.Time `json:"created_at"`
+	Name         string    `json:"name"`
+	Markdown     string    `json:"markdown"`
+	Items        string    `json:"items"`
+	ItemCount    int       `json:"item_count"`
+	DisplayCount int       `json:"display_count"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+func countDisplayItems(markdown string) int {
+	count := 0
+	for _, line := range strings.Split(markdown, "\n") {
+		if strings.HasPrefix(line, "## ") {
+			count++
+		}
+	}
+
+	return count
 }
