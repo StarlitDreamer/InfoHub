@@ -4,6 +4,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -14,6 +15,7 @@ const defaultHTTPAddr = ":8080"
 // Config 保存信息汇总 Agent 的运行配置。
 type Config struct {
 	RSSURL           string
+	RSSURLs          []string
 	AIEndpoint       string
 	AIAPIKey         string
 	AIModel          string
@@ -25,8 +27,10 @@ type Config struct {
 
 // LoadFromEnv 从环境变量加载配置。
 func LoadFromEnv() Config {
+	rssURL := os.Getenv("INFOHUB_RSS_URL")
 	return Config{
-		RSSURL:           os.Getenv("INFOHUB_RSS_URL"),
+		RSSURL:           rssURL,
+		RSSURLs:          readList("INFOHUB_RSS_URLS", rssURL),
 		AIEndpoint:       os.Getenv("INFOHUB_AI_ENDPOINT"),
 		AIAPIKey:         os.Getenv("INFOHUB_AI_API_KEY"),
 		AIModel:          os.Getenv("INFOHUB_AI_MODEL"),
@@ -39,7 +43,7 @@ func LoadFromEnv() Config {
 
 // UseRSS 判断是否启用真实 RSS 数据源。
 func (c Config) UseRSS() bool {
-	return c.RSSURL != ""
+	return len(c.RSSURLs) > 0
 }
 
 // UseRealAI 判断是否启用真实 AI 客户端。
@@ -73,4 +77,27 @@ func readString(name, fallback string) string {
 	}
 
 	return value
+}
+
+func readList(name, fallback string) []string {
+	values := splitList(os.Getenv(name))
+	if len(values) > 0 {
+		return values
+	}
+
+	return splitList(fallback)
+}
+
+func splitList(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+
+	return result
 }

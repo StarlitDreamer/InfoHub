@@ -113,7 +113,16 @@ var timeNow = func() time.Time {
 
 func newCrawler(cfg config.Config) crawler.Crawler {
 	if cfg.UseRSS() {
-		return crawler.NewRSSCrawler(cfg.RSSURL, nil)
+		crawlers := make([]crawler.Crawler, 0, len(cfg.RSSURLs))
+		for _, url := range cfg.RSSURLs {
+			crawlers = append(crawlers, crawler.NewRSSCrawler(url, nil))
+		}
+
+		if len(crawlers) == 1 {
+			return crawlers[0]
+		}
+
+		return crawler.NewMultiCrawler(crawlers)
 	}
 
 	return crawler.NewDemoCrawler()

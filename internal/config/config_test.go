@@ -7,6 +7,7 @@ import (
 
 func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("INFOHUB_RSS_URL", "https://example.com/rss.xml")
+	t.Setenv("INFOHUB_RSS_URLS", "https://example.com/a.xml, https://example.com/b.xml")
 	t.Setenv("INFOHUB_AI_ENDPOINT", "https://api.example.com/v1/chat/completions")
 	t.Setenv("INFOHUB_AI_API_KEY", "test-key")
 	t.Setenv("INFOHUB_AI_MODEL", "test-model")
@@ -19,6 +20,10 @@ func TestLoadFromEnv(t *testing.T) {
 
 	if !cfg.UseRSS() {
 		t.Fatal("期望启用 RSS 数据源")
+	}
+
+	if len(cfg.RSSURLs) != 2 {
+		t.Fatalf("期望读取 2 个 RSS 数据源，实际为 %d", len(cfg.RSSURLs))
 	}
 
 	if !cfg.UseRealAI() {
@@ -39,6 +44,16 @@ func TestLoadFromEnv(t *testing.T) {
 
 	if cfg.HTTPAddr != ":9090" {
 		t.Fatalf("期望 HTTP 地址为 :9090，实际为 %s", cfg.HTTPAddr)
+	}
+}
+
+func TestLoadFromEnvFallsBackToSingleRSSURL(t *testing.T) {
+	t.Setenv("INFOHUB_RSS_URL", "https://example.com/rss.xml")
+
+	cfg := LoadFromEnv()
+
+	if len(cfg.RSSURLs) != 1 || cfg.RSSURLs[0] != "https://example.com/rss.xml" {
+		t.Fatalf("期望兼容单个 RSS URL，实际为 %+v", cfg.RSSURLs)
 	}
 }
 
