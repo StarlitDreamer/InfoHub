@@ -104,12 +104,13 @@ func (a *Agent) RunWithRequest(ctx context.Context, request AgentRequest) (Resul
 	sortedItems := SortByDecisionScore(items, a.now())
 	sortedItems = applySourcePriority(sortedItems, request)
 	displayItems := LimitItems(filterReportItems(sortedItems, request), a.reportMaxItems)
+
 	report := delivery.RenderMarkdown(displayItems)
 	if a.groupBySource {
 		report = delivery.RenderMarkdownBySource(displayItems)
 	}
-	generatedAt := a.now()
 
+	generatedAt := a.now()
 	record := repository.ReportRecord{
 		GeneratedAt: generatedAt,
 		Markdown:    report,

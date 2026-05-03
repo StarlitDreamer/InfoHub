@@ -62,6 +62,7 @@ func (p *Pipeline) RunContext(ctx context.Context) ([]model.NewsItem, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		summarized := item
 		summarized.Tags = analysis.Tags
 		summarized.Content = analysis.Summary
