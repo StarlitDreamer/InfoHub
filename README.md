@@ -73,6 +73,10 @@ go run cmd\main.go run-once
 - `INFOHUB_DEDUP_STORE_PATH`：跨运行去重状态文件，默认 `data/dedup/seen.json`。
 - `INFOHUB_HTTP_ADDR`：Gin HTTP 服务监听地址，默认 `:8080`。
 - `INFOHUB_AUTH_TOKEN`：Gin API 鉴权 token，留空时不启用鉴权。
+- `INFOHUB_REDIS_ADDR`：Redis 地址，留空时使用文件版去重。
+- `INFOHUB_REDIS_PASSWORD`：Redis 密码。
+- `INFOHUB_REDIS_DB`：Redis DB，默认 `0`。
+- `INFOHUB_REDIS_DEDUP_KEY`：Redis 去重 set key，默认 `infohub:dedup:seen`。
 - `INFOHUB_SCHEDULE_INTERVAL_SECONDS`：定时任务间隔秒数，默认 `3600`。
 
 ## HTTP API
@@ -172,6 +176,13 @@ docker compose up --build
 
 系统会先做单次运行内标题去重，再做跨运行去重。跨运行去重 key 优先使用 URL；URL 为空时使用标题，并通过 SHA-256 生成稳定指纹。
 
+默认使用文件版跨运行去重。如果配置了 Redis 地址，则使用 Redis set：
+
+```bash
+INFOHUB_REDIS_ADDR=localhost:6379
+INFOHUB_REDIS_DEDUP_KEY=infohub:dedup:seen
+```
+
 当没有新增信息时，日报会输出：
 
 ```md
@@ -191,12 +202,11 @@ INFOHUB_SEND_EMPTY_REPORT=true
 - RSS 解析目前覆盖基础 RSS 字段，尚未支持复杂 Feed 清洗。
 - mock AI 可用于本地开发；真实摘要需要配置 OpenAI 兼容接口。
 - 当前存储为文件版，尚未接入 MySQL。
-- 当前跨运行去重为文件版，尚未接入 Redis。
+- Redis 去重已支持，但 TTL 和按日期分桶尚未实现。
 - Gin API 支持 Bearer Token 鉴权，部署到公网前仍建议放在反向代理或内网访问控制之后。
 
 ## 建议下一步
 
-- 接入 Redis 版跨运行去重。
 - 接入 MySQL repository。
 - 增强 RSS 内容清洗和 HTML 摘要提取。
 - 增加生产环境反向代理和 HTTPS 示例。

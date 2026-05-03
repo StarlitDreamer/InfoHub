@@ -14,6 +14,7 @@ const defaultScheduleInterval = time.Hour
 const defaultStorageDir = "data/reports"
 const defaultHTTPAddr = ":8080"
 const defaultDedupStorePath = "data/dedup/seen.json"
+const defaultRedisDedupKey = "infohub:dedup:seen"
 
 // Config 保存信息汇总 Agent 的运行配置。
 type Config struct {
@@ -29,6 +30,10 @@ type Config struct {
 	DedupStorePath   string
 	SendEmptyReport  bool
 	AuthToken        string
+	RedisAddr        string
+	RedisPassword    string
+	RedisDB          int
+	RedisDedupKey    string
 }
 
 // Load 先读取 JSON 配置文件，再使用环境变量覆盖。
@@ -73,6 +78,7 @@ func defaultConfig() Config {
 		StorageDir:       defaultStorageDir,
 		HTTPAddr:         defaultHTTPAddr,
 		DedupStorePath:   defaultDedupStorePath,
+		RedisDedupKey:    defaultRedisDedupKey,
 	}
 }
 
@@ -128,6 +134,18 @@ func mergeConfig(base, override Config) Config {
 	if override.AuthToken != "" {
 		base.AuthToken = override.AuthToken
 	}
+	if override.RedisAddr != "" {
+		base.RedisAddr = override.RedisAddr
+	}
+	if override.RedisPassword != "" {
+		base.RedisPassword = override.RedisPassword
+	}
+	if override.RedisDB != 0 {
+		base.RedisDB = override.RedisDB
+	}
+	if override.RedisDedupKey != "" {
+		base.RedisDedupKey = override.RedisDedupKey
+	}
 
 	return base
 }
@@ -148,6 +166,10 @@ func applyEnv(cfg Config) Config {
 	cfg.DedupStorePath = readString("INFOHUB_DEDUP_STORE_PATH", cfg.DedupStorePath)
 	cfg.SendEmptyReport = readBool("INFOHUB_SEND_EMPTY_REPORT", cfg.SendEmptyReport)
 	cfg.AuthToken = readString("INFOHUB_AUTH_TOKEN", cfg.AuthToken)
+	cfg.RedisAddr = readString("INFOHUB_REDIS_ADDR", cfg.RedisAddr)
+	cfg.RedisPassword = readString("INFOHUB_REDIS_PASSWORD", cfg.RedisPassword)
+	cfg.RedisDB = readInt("INFOHUB_REDIS_DB", cfg.RedisDB)
+	cfg.RedisDedupKey = readString("INFOHUB_REDIS_DEDUP_KEY", cfg.RedisDedupKey)
 
 	return cfg
 }
@@ -178,6 +200,12 @@ type fileConfig struct {
 	Auth struct {
 		Token string `json:"token"`
 	} `json:"auth"`
+	Redis struct {
+		Addr     string `json:"addr"`
+		Password string `json:"password"`
+		DB       int    `json:"db"`
+		DedupKey string `json:"dedup_key"`
+	} `json:"redis"`
 	Scheduler struct {
 		IntervalSeconds int `json:"interval_seconds"`
 	} `json:"scheduler"`
@@ -196,6 +224,10 @@ func (f fileConfig) toConfig() Config {
 		HTTPAddr:        f.HTTP.Addr,
 		DedupStorePath:  f.Dedup.StorePath,
 		AuthToken:       f.Auth.Token,
+		RedisAddr:       f.Redis.Addr,
+		RedisPassword:   f.Redis.Password,
+		RedisDB:         f.Redis.DB,
+		RedisDedupKey:   f.Redis.DedupKey,
 	}
 
 	if f.Scheduler.IntervalSeconds > 0 {
@@ -230,6 +262,20 @@ func readString(name, fallback string) string {
 	}
 
 	return value
+}
+
+func readInt(name string, fallback int) int {
+	value := os.Getenv(name)
+	if value == "" {
+		return fallback
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+
+	return parsed
 }
 
 func readList(name, fallback string) []string {

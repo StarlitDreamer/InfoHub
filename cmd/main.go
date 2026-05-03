@@ -56,7 +56,7 @@ func runReport(ctx context.Context, cfg config.Config) (server.ReportResult, err
 	pipeline := service.NewPipeline(
 		newCrawler(cfg),
 		newAIProcessor(cfg),
-	).WithDedupStore(processor.NewFileDedupStore(cfg.DedupStorePath))
+	).WithDedupStore(newDedupStore(cfg))
 	items, err := pipeline.RunContext(ctx)
 	if err != nil {
 		return server.ReportResult{}, err
@@ -144,4 +144,13 @@ func newAIProcessor(cfg config.Config) ai.Processor {
 	}
 
 	return ai.NewMockProcessor()
+}
+
+func newDedupStore(cfg config.Config) processor.DedupStore {
+	if cfg.RedisAddr != "" {
+		client := processor.NewRedisClient(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisDB)
+		return processor.NewRedisDedupStore(client, cfg.RedisDedupKey)
+	}
+
+	return processor.NewFileDedupStore(cfg.DedupStorePath)
 }

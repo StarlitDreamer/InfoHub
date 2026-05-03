@@ -27,6 +27,12 @@
   "auth": {
     "token": ""
   },
+  "redis": {
+    "addr": "",
+    "password": "",
+    "db": 0,
+    "dedup_key": "infohub:dedup:seen"
+  },
   "scheduler": {
     "interval_seconds": 3600
   }

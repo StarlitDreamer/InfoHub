@@ -20,6 +20,10 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("INFOHUB_DEDUP_STORE_PATH", "tmp/dedup/seen.json")
 	t.Setenv("INFOHUB_SEND_EMPTY_REPORT", "true")
 	t.Setenv("INFOHUB_AUTH_TOKEN", "env-token")
+	t.Setenv("INFOHUB_REDIS_ADDR", "localhost:6379")
+	t.Setenv("INFOHUB_REDIS_PASSWORD", "secret")
+	t.Setenv("INFOHUB_REDIS_DB", "2")
+	t.Setenv("INFOHUB_REDIS_DEDUP_KEY", "custom:dedup")
 
 	cfg := LoadFromEnv()
 
@@ -61,6 +65,10 @@ func TestLoadFromEnv(t *testing.T) {
 
 	if cfg.AuthToken != "env-token" {
 		t.Fatalf("期望读取鉴权 token，实际为 %s", cfg.AuthToken)
+	}
+
+	if cfg.RedisAddr != "localhost:6379" || cfg.RedisPassword != "secret" || cfg.RedisDB != 2 || cfg.RedisDedupKey != "custom:dedup" {
+		t.Fatalf("Redis 配置不符合预期：%+v", cfg)
 	}
 }
 
@@ -110,6 +118,7 @@ func TestLoadFromJSONFile(t *testing.T) {
   "dedup": {"store_path": "file/dedup/seen.json"},
   "http": {"addr": ":7070"},
   "auth": {"token": "file-token"},
+  "redis": {"addr": "redis:6379", "password": "file-secret", "db": 1, "dedup_key": "file:dedup"},
   "scheduler": {"interval_seconds": 300}
 }`
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
@@ -136,6 +145,10 @@ func TestLoadFromJSONFile(t *testing.T) {
 
 	if cfg.AuthToken != "file-token" {
 		t.Fatalf("期望读取文件中的鉴权 token，实际为 %s", cfg.AuthToken)
+	}
+
+	if cfg.RedisAddr != "redis:6379" || cfg.RedisPassword != "file-secret" || cfg.RedisDB != 1 || cfg.RedisDedupKey != "file:dedup" {
+		t.Fatalf("期望读取文件中的 Redis 配置，实际为 %+v", cfg)
 	}
 }
 
