@@ -227,8 +227,8 @@ The local RSS config currently uses these feeds:
 
 The local RSS config also trims feed volume by default:
 
-- keep only items from the last `72` hours
-- keep at most `20` items per feed
+- keep only items from the last `168` hours
+- keep at most `15` items per feed
 
 ## Current limitations
 
