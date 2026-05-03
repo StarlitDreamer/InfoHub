@@ -11,7 +11,7 @@ services:
       MYSQL_USER: infohub
       MYSQL_PASSWORD: infohub
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql-data:/var/lib/mysql
       - ./scripts/mysql/init:/docker-entrypoint-initdb.d:ro
@@ -37,10 +37,10 @@ services:
     ports:
       - "8080:8080"
     environment:
-      INFOHUB_CONFIG_PATH: /app/configs/config.example.json
+      INFOHUB_CONFIG_PATH: ${INFOHUB_CONFIG_PATH:-/app/configs/config.example.json}
       INFOHUB_HTTP_ADDR: :8080
     volumes:
-      - ./configs/config.example.json:/app/configs/config.example.json:ro
+      - ./configs:/app/configs:ro
       - ./data:/app/data
     restart: unless-stopped
 

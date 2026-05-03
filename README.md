@@ -81,6 +81,10 @@ The example files are:
 - [configs/config.example.json](D:/code/GolandProjects/InfoHub/configs/config.example.json)
 - [configs/config.example.env](D:/code/GolandProjects/InfoHub/configs/config.example.env)
 
+For local RSS verification without touching the example config, use:
+
+- `configs/config.local.json`
+
 Common environment variables:
 
 - `INFOHUB_CONFIG_PATH`
@@ -177,6 +181,19 @@ Run the full local stack:
 docker compose up --build
 ```
 
+Run the stack with the local RSS config:
+
+```bash
+INFOHUB_CONFIG_PATH=/app/configs/config.local.json docker compose up --build
+```
+
+PowerShell example:
+
+```powershell
+$env:INFOHUB_CONFIG_PATH="/app/configs/config.local.json"
+docker compose up --build
+```
+
 This starts:
 
 - `mysql:8.4` on `localhost:3306`
@@ -200,6 +217,11 @@ Default DSN inside Docker Compose:
 ```text
 infohub:infohub@tcp(mysql:3306)/infohub?charset=utf8mb4&parseTime=true&loc=Local
 ```
+
+The local RSS config currently uses these feeds:
+
+- [Google Blog RSS](https://blog.google/rss/)
+- [OpenAI News RSS](https://openai.com/news/rss.xml)
 
 ## Current limitations
 
