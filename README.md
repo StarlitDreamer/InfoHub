@@ -240,7 +240,15 @@ Run the full local stack:
 docker compose up --build
 ```
 
-Run the stack with the local RSS config:
+By default, Docker Compose now uses:
+
+```text
+/app/configs/config.local.json
+```
+
+This keeps the local stack on RSS + mock AI by default, which is safer for verification.
+
+If you want to override the config explicitly:
 
 ```bash
 INFOHUB_CONFIG_PATH=/app/configs/config.local.json docker compose up --build

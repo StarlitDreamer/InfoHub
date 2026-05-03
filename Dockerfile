@@ -23,7 +23,7 @@ USER infohub
 
 EXPOSE 8080
 
-ENV INFOHUB_CONFIG_PATH=/app/configs/config.example.json
+ENV INFOHUB_CONFIG_PATH=/app/configs/config.local.json
 ENV INFOHUB_HTTP_ADDR=:8080
 
 CMD ["/app/infohub-agent", "serve"]

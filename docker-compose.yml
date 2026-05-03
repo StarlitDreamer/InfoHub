@@ -37,7 +37,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      INFOHUB_CONFIG_PATH: ${INFOHUB_CONFIG_PATH:-/app/configs/config.example.json}
+      INFOHUB_CONFIG_PATH: ${INFOHUB_CONFIG_PATH:-/app/configs/config.local.json}
       INFOHUB_HTTP_ADDR: :8080
       INFOHUB_REPORT_MAX_ITEMS: ${INFOHUB_REPORT_MAX_ITEMS:-12}
     volumes:
