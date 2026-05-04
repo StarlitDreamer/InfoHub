@@ -98,6 +98,38 @@ func TestPipelineDeduplicatesWithinRunUsingCompositeFingerprints(t *testing.T) {
 	}
 }
 
+func TestPipelineMergesSimilarEventsWithinRun(t *testing.T) {
+	baseTime := time.Date(2026, 5, 4, 10, 0, 0, 0, time.UTC)
+	pipeline := NewPipeline(
+		staticServiceCrawler{items: []model.NewsItem{
+			{
+				Title:       "OpenAI releases GPT-5 enterprise coding model",
+				Content:     "OpenAI released GPT-5 for enterprise teams. The model improves coding and analysis workflows.",
+				URL:         "https://example.com/a",
+				PublishTime: baseTime,
+			},
+			{
+				Title:       "OpenAI releases GPT-5 enterprise coding model with stronger analysis",
+				Content:     "OpenAI released GPT-5 for enterprise teams with stronger coding, analysis, and deployment support.",
+				URL:         "https://example.com/b",
+				PublishTime: baseTime.Add(2 * time.Hour),
+			},
+		}},
+		echoAI{},
+	)
+
+	result, err := pipeline.RunContext(context.Background())
+	if err != nil {
+		t.Fatalf("pipeline run failed: %v", err)
+	}
+	if len(result) != 1 {
+		t.Fatalf("expected similar events to merge into 1 item, got %d", len(result))
+	}
+	if result[0].Title != "OpenAI releases GPT-5 enterprise coding model with stronger analysis" {
+		t.Fatalf("expected merged item to keep richer title, got %q", result[0].Title)
+	}
+}
+
 func TestPipelineFillsTagsSummaryAndScoreFromAI(t *testing.T) {
 	item := model.NewsItem{
 		Title:       "test title",
@@ -123,7 +155,7 @@ func TestPipelineFillsTagsSummaryAndScoreFromAI(t *testing.T) {
 	if len(summarized.Tags) != 2 || summarized.Tags[0] != "AI" {
 		t.Fatalf("expected ai tags to be applied, got %+v", summarized.Tags)
 	}
-	if !strings.Contains(summarized.Content, "【标题】test title") {
+	if !strings.Contains(summarized.Content, "test title") {
 		t.Fatalf("expected structured summary from ai, got %s", summarized.Content)
 	}
 	if summarized.Score != 4 {

@@ -17,6 +17,6 @@ func TestDeduplicateByEmbeddingMergesSimilarContent(t *testing.T) {
 	result := DeduplicateByEmbedding(items, provider, 0.9)
 
 	if len(result) != 2 {
-		t.Fatalf("期望合并相似内容后剩余 2 条，实际得到 %d 条", len(result))
+		t.Fatalf("expected 2 items after embedding deduplication, got %d", len(result))
 	}
 }
