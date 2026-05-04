@@ -1,5 +1,7 @@
 # TASKS.md — 信息汇总 Agent 开发清单
 
+[简体中文](./TASKS.md) | [English](./TASKS.en.md)
+
 ## 0. 全局执行规则（GLOBAL RULES）
 
 ### 执行流程（必须遵守）

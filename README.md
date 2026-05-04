@@ -1,5 +1,7 @@
 # InfoHub Agent
 
+[English](./README.md) | [简体中文](./README.zh.md)
+
 InfoHub Agent is an information aggregation and decision-support service. It collects content from RSS and demo sources, deduplicates items, runs AI summarization and scoring, and outputs a decision-ready daily report.
 
 ## Current capabilities

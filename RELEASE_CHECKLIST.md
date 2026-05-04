@@ -1,5 +1,7 @@
 # InfoHub Release Checklist
 
+[English](./RELEASE_CHECKLIST.md) | [简体中文](./RELEASE_CHECKLIST.zh.md)
+
 ## Release target
 
 Ship a usable information aggregation agent that can:
