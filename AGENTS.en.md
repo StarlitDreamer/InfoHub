@@ -135,6 +135,12 @@ When the agent processes information, it must follow this order:
 - Do not introduce undeclared dependencies
 - Do not modify unrelated modules
 
+## 7.1 Documentation standards
+
+- Markdown documents in this repository must always be provided in both Chinese and English
+- Keep the default entry filename and add the paired language version with a suffix, for example `README.md` with `README.zh.md`, and `AGENTS.md` with `AGENTS.en.md`
+- Whenever any `.md` file is added or updated, the corresponding language version must be updated as well so the two versions do not drift apart
+
 ## 8. Codex working rules
 
 When Codex executes a task, it must:
