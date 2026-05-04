@@ -32,7 +32,16 @@ func TestRunReport(t *testing.T) {
 	called := false
 	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
 		called = true
-		return ReportResult{ItemCount: 26, DisplayCount: 12}, nil
+		return ReportResult{
+			ItemCount:         26,
+			DisplayCount:      12,
+			GeneratedAt:       time.Date(2026, 5, 4, 8, 0, 0, 0, time.UTC),
+			HighPriorityCount: 3,
+			TopPriorityItems:  []string{"alpha"},
+			DecisionSummary: []reportDecisionSummary{
+				{Title: "alpha", Action: "立即评审", Summary: "summary"},
+			},
+		}, nil
 	}, Options{})
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/reports/run", nil)
@@ -51,6 +60,9 @@ func TestRunReport(t *testing.T) {
 	}
 	if !strings.Contains(body, `"display_count":12`) {
 		t.Fatalf("expected response to include display_count, got %s", body)
+	}
+	if !strings.Contains(body, `"top_priority_items":["alpha"]`) {
+		t.Fatalf("expected response to include run summary, got %s", body)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -38,8 +39,12 @@ type PreferenceRequest struct {
 
 // ReportResult 表示一次日报生成结果摘要。
 type ReportResult struct {
-	ItemCount    int `json:"item_count"`
-	DisplayCount int `json:"display_count"`
+	ItemCount         int                     `json:"item_count"`
+	DisplayCount      int                     `json:"display_count"`
+	GeneratedAt       time.Time               `json:"generated_at"`
+	HighPriorityCount int                     `json:"high_priority_count"`
+	TopPriorityItems  []string                `json:"top_priority_items"`
+	DecisionSummary   []reportDecisionSummary `json:"decision_summary"`
 }
 
 // Options 保存 HTTP 服务选项。
@@ -94,9 +99,13 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Op
 		}
 
 		ctx.JSON(http.StatusOK, gin.H{
-			"status":        "generated",
-			"item_count":    result.ItemCount,
-			"display_count": result.DisplayCount,
+			"status":              "generated",
+			"item_count":          result.ItemCount,
+			"display_count":       result.DisplayCount,
+			"generated_at":        result.GeneratedAt,
+			"high_priority_count": result.HighPriorityCount,
+			"top_priority_items":  result.TopPriorityItems,
+			"decision_summary":    result.DecisionSummary,
 		})
 	})
 
@@ -232,6 +241,19 @@ func buildReportOverview(markdown string, items []model.NewsItem, limit int) rep
 		HighPriorityCount: base.HighPriorityCount,
 		TopPriorityItems:  base.TopTitles,
 		DecisionSummary:   buildDecisionSummary(items, limit),
+	}
+}
+
+// BuildReportResult 根据一次执行结果构建对外返回的轻量摘要。
+func BuildReportResult(itemCount, displayCount int, generatedAt time.Time, markdown string, items []model.NewsItem, limit int) ReportResult {
+	overview := buildReportOverview(markdown, items, limit)
+	return ReportResult{
+		ItemCount:         itemCount,
+		DisplayCount:      displayCount,
+		GeneratedAt:       generatedAt,
+		HighPriorityCount: overview.HighPriorityCount,
+		TopPriorityItems:  overview.TopPriorityItems,
+		DecisionSummary:   overview.DecisionSummary,
 	}
 }
 

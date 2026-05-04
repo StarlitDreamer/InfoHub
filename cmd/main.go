@@ -85,10 +85,14 @@ func runReportWithRepository(ctx context.Context, cfg config.Config, repo reposi
 	}
 
 	fmt.Print(result.Markdown)
-	return server.ReportResult{
-		ItemCount:    result.ItemCount,
-		DisplayCount: result.DisplayCount,
-	}, nil
+	return server.BuildReportResult(
+		result.ItemCount,
+		result.DisplayCount,
+		result.GeneratedAt,
+		result.Markdown,
+		result.Items,
+		3,
+	), nil
 }
 
 func runSchedule(ctx context.Context, cfg config.Config) error {

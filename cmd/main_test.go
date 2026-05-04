@@ -52,6 +52,12 @@ func TestRunReportReturnsItemAndDisplayCount(t *testing.T) {
 	if result.DisplayCount != 2 {
 		t.Fatalf("expected 2 displayed items, got %d", result.DisplayCount)
 	}
+	if len(result.TopPriorityItems) == 0 {
+		t.Fatalf("expected run summary titles, got %+v", result)
+	}
+	if len(result.DecisionSummary) == 0 {
+		t.Fatalf("expected run decision summary, got %+v", result)
+	}
 
 	result, err = runReport(context.Background(), cfg, "manual")
 	if err != nil {
@@ -89,6 +95,20 @@ func TestRunReportWithRepositorySavesSortedItemsAndTrimmedMarkdown(t *testing.T)
 	if result.DisplayCount != 2 {
 		t.Fatalf("expected 2 displayed items, got %d", result.DisplayCount)
 	}
+	expectedOrder := []string{
+		"开源模型发布新版本",
+		"数据库社区讨论新索引策略",
+		"云厂商推出开发者工具更新",
+	}
+	if result.GeneratedAt != fixedNow {
+		t.Fatalf("expected generated time %s, got %s", fixedNow, result.GeneratedAt)
+	}
+	if len(result.TopPriorityItems) != 3 || result.TopPriorityItems[0] != expectedOrder[0] {
+		t.Fatalf("expected top priority titles in result, got %+v", result.TopPriorityItems)
+	}
+	if len(result.DecisionSummary) != 3 || result.DecisionSummary[0].Title != expectedOrder[0] {
+		t.Fatalf("expected decision summary in result, got %+v", result.DecisionSummary)
+	}
 	if repo.saveCalls != 1 {
 		t.Fatalf("expected repository Save to be called once, got %d", repo.saveCalls)
 	}
@@ -99,11 +119,6 @@ func TestRunReportWithRepositorySavesSortedItemsAndTrimmedMarkdown(t *testing.T)
 		t.Fatalf("expected repository to store all sorted items, got %d", len(repo.record.Items))
 	}
 
-	expectedOrder := []string{
-		"开源模型发布新版本",
-		"数据库社区讨论新索引策略",
-		"云厂商推出开发者工具更新",
-	}
 	for index, title := range expectedOrder {
 		if repo.record.Items[index].Title != title {
 			t.Fatalf("expected sorted item %d to be %s, got %s", index, title, repo.record.Items[index].Title)
@@ -145,6 +160,9 @@ func TestRunReportWithRepositoryStoresEmptyReportWhenNoNewItems(t *testing.T) {
 
 	if result.ItemCount != 0 || result.DisplayCount != 0 {
 		t.Fatalf("expected second run to generate empty result, got %+v", result)
+	}
+	if len(result.TopPriorityItems) != 0 || len(result.DecisionSummary) != 0 {
+		t.Fatalf("expected empty run summary, got %+v", result)
 	}
 	if secondRepo.saveCalls != 1 {
 		t.Fatalf("expected repository Save on empty report, got %d calls", secondRepo.saveCalls)
