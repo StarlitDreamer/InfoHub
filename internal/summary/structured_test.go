@@ -1,6 +1,7 @@
 package summary
 
 import (
+	"strings"
 	"testing"
 
 	"InfoHub-agent/internal/model"
@@ -35,5 +36,19 @@ func TestParseFallsBackForPlainSummary(t *testing.T) {
 	}
 	if result.WhyImportant == "" || result.Impact == "" {
 		t.Fatalf("expected default importance and impact, got %+v", result)
+	}
+}
+
+func TestRecommendActionReturnsUnifiedLabelAndDescription(t *testing.T) {
+	action := RecommendAction(
+		model.NewsItem{Score: 3, Tags: []string{"Database"}},
+		Structured{WhyImportant: "数据库性能值得关注"},
+	)
+
+	if action.Label != "专项验证" {
+		t.Fatalf("expected database label, got %+v", action)
+	}
+	if !strings.Contains(action.Description, "专项验证") {
+		t.Fatalf("expected database description, got %+v", action)
 	}
 }

@@ -119,17 +119,17 @@ func TestSummarizePriorityActionsDeduplicates(t *testing.T) {
 }
 
 func TestRecommendActionUsesScoreAndTopicSignals(t *testing.T) {
-	high := recommendAction(model.NewsItem{Score: 5}, summary.Structured{})
-	if !strings.Contains(high, "优先安排评审") {
-		t.Fatalf("expected top score action, got %s", high)
+	high := summary.RecommendAction(model.NewsItem{Score: 5}, summary.Structured{})
+	if !strings.Contains(high.Description, "优先安排评审") {
+		t.Fatalf("expected top score action, got %+v", high)
 	}
 
-	database := recommendAction(
+	database := summary.RecommendAction(
 		model.NewsItem{Score: 3, Tags: []string{"Database"}},
 		summary.Structured{WhyImportant: "数据库性能值得关注"},
 	)
-	if !strings.Contains(database, "专项验证") {
-		t.Fatalf("expected database action, got %s", database)
+	if !strings.Contains(database.Description, "专项验证") {
+		t.Fatalf("expected database action, got %+v", database)
 	}
 }
 

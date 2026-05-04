@@ -246,37 +246,18 @@ func buildDecisionSummary(items []model.NewsItem, limit int) []reportDecisionSum
 	result := make([]reportDecisionSummary, 0, len(items))
 	for _, item := range items {
 		parsed := summary.Parse(item)
+		action := summary.RecommendAction(item, parsed)
 		result = append(result, reportDecisionSummary{
 			Title:   parsed.Title,
 			Source:  normalizeSource(item),
 			Score:   item.Score,
 			Tags:    append([]string(nil), item.Tags...),
-			Action:  summarizeAction(item),
+			Action:  action.Label,
 			Summary: parsed.WhatHappened,
 		})
 	}
 
 	return result
-}
-
-func summarizeAction(item model.NewsItem) string {
-	score := item.Score
-	text := strings.ToLower(strings.Join(item.Tags, " ") + " " + item.Title + " " + item.Content)
-
-	switch {
-	case score >= 5:
-		return "立即评审"
-	case score >= 4:
-		return "近期跟进"
-	case strings.Contains(text, "security") || strings.Contains(text, "安全") || strings.Contains(text, "cyber"):
-		return "安全评估"
-	case strings.Contains(text, "database") || strings.Contains(text, "数据库") || strings.Contains(text, "index"):
-		return "专项验证"
-	case strings.Contains(text, "ai") || strings.Contains(text, "agent") || strings.Contains(text, "模型"):
-		return "小范围试用"
-	default:
-		return "持续观察"
-	}
 }
 
 func normalizeSource(item model.NewsItem) string {
