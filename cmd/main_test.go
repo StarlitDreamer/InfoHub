@@ -286,10 +286,18 @@ func TestMergePreferenceOverridesConfiguredValuesWhenRequestProvided(t *testing.
 			Tags:     []string{"AI"},
 			Sources:  []string{"config-source"},
 			Keywords: []string{"workflow"},
+			Weights: service.PreferenceWeights{
+				TagMatch:     1.2,
+				SourceMatch:  1.0,
+				KeywordMatch: 0.6,
+			},
 		},
 		service.UserPreference{
 			Tags:    []string{"数据库"},
 			Sources: []string{"request-source"},
+			Weights: service.PreferenceWeights{
+				SourceMatch: 1.5,
+			},
 		},
 	)
 
@@ -301,6 +309,9 @@ func TestMergePreferenceOverridesConfiguredValuesWhenRequestProvided(t *testing.
 	}
 	if len(merged.Keywords) != 1 || merged.Keywords[0] != "workflow" {
 		t.Fatalf("expected missing request keywords to keep config value, got %+v", merged)
+	}
+	if merged.Weights.TagMatch != 1.2 || merged.Weights.SourceMatch != 1.5 || merged.Weights.KeywordMatch != 0.6 {
+		t.Fatalf("expected weights to merge correctly, got %+v", merged.Weights)
 	}
 }
 
@@ -343,6 +354,20 @@ func TestResolveUserPreferenceReturnsUnexpectedError(t *testing.T) {
 	_, err := resolveUserPreference(context.Background(), &preferenceRepoStub{err: expectedErr}, "alice")
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("expected %v, got %v", expectedErr, err)
+	}
+}
+
+func TestNewUserPreferenceRepositoryFallsBackToFile(t *testing.T) {
+	repo, closeFn, err := newUserPreferenceRepository(config.Config{
+		StorageDir: t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("expected file preference repository, got %v", err)
+	}
+	defer closeFn()
+
+	if _, ok := repo.(*repository.FileUserPreferenceRepository); !ok {
+		t.Fatalf("expected file preference repository, got %T", repo)
 	}
 }
 

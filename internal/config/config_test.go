@@ -43,6 +43,7 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("INFOHUB_REDIS_DEDUP_KEY", "custom:dedup")
 	t.Setenv("INFOHUB_MYSQL_DSN", "user:pass@tcp(localhost:3306)/infohub?parseTime=true")
 	t.Setenv("INFOHUB_MYSQL_TABLE", "daily_reports")
+	t.Setenv("INFOHUB_MYSQL_PREFERENCE_TABLE", "daily_user_preferences")
 
 	cfg := LoadFromEnv()
 
@@ -106,6 +107,9 @@ func TestLoadFromEnv(t *testing.T) {
 	if cfg.MySQLDSN != "user:pass@tcp(localhost:3306)/infohub?parseTime=true" || cfg.MySQLTable != "daily_reports" {
 		t.Fatalf("unexpected MySQL config: %+v", cfg)
 	}
+	if cfg.MySQLPreferenceTable != "daily_user_preferences" {
+		t.Fatalf("unexpected MySQL preference table: %+v", cfg)
+	}
 }
 
 func TestLoadFromEnvFallsBackToSingleRSSURL(t *testing.T) {
@@ -141,6 +145,9 @@ func TestLoadFromEnvUsesFallbackInterval(t *testing.T) {
 	if cfg.MySQLTable != defaultMySQLTable {
 		t.Fatalf("expected default MySQL table, got %s", cfg.MySQLTable)
 	}
+	if cfg.MySQLPreferenceTable != defaultMySQLPreferenceTable {
+		t.Fatalf("expected default MySQL preference table, got %s", cfg.MySQLPreferenceTable)
+	}
 	if cfg.SendEmptyReport {
 		t.Fatal("did not expect empty report sending by default")
 	}
@@ -161,7 +168,7 @@ func TestLoadFromJSONFile(t *testing.T) {
   "http": {"addr": ":7070"},
   "auth": {"token": "file-token"},
   "redis": {"addr": "redis:6379", "password": "file-secret", "db": 1, "dedup_key": "file:dedup"},
-  "mysql": {"dsn": "user:pass@tcp(mysql:3306)/infohub?parseTime=true", "table": "report_records"},
+  "mysql": {"dsn": "user:pass@tcp(mysql:3306)/infohub?parseTime=true", "table": "report_records", "preference_table": "preference_records"},
   "scheduler": {"interval_seconds": 300, "cron": "0 9 * * 1-5"}
 }`
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
@@ -216,6 +223,9 @@ func TestLoadFromJSONFile(t *testing.T) {
 	if cfg.MySQLDSN != "user:pass@tcp(mysql:3306)/infohub?parseTime=true" || cfg.MySQLTable != "report_records" {
 		t.Fatalf("unexpected MySQL config: %+v", cfg)
 	}
+	if cfg.MySQLPreferenceTable != "preference_records" {
+		t.Fatalf("unexpected MySQL preference table: %+v", cfg)
+	}
 }
 
 func TestSourcesOrDefaultPrefersExplicitSources(t *testing.T) {
@@ -256,6 +266,7 @@ func TestLoadEnvOverridesJSONFile(t *testing.T) {
 	t.Setenv("INFOHUB_AI_MODEL", "env-model")
 	t.Setenv("INFOHUB_HTTP_ADDR", ":9090")
 	t.Setenv("INFOHUB_MYSQL_TABLE", "env_reports")
+	t.Setenv("INFOHUB_MYSQL_PREFERENCE_TABLE", "env_preference_reports")
 
 	cfg, err := Load()
 	if err != nil {
@@ -270,6 +281,9 @@ func TestLoadEnvOverridesJSONFile(t *testing.T) {
 	}
 	if cfg.MySQLTable != "env_reports" {
 		t.Fatalf("expected env MySQL table, got %s", cfg.MySQLTable)
+	}
+	if cfg.MySQLPreferenceTable != "env_preference_reports" {
+		t.Fatalf("expected env MySQL preference table, got %s", cfg.MySQLPreferenceTable)
 	}
 }
 

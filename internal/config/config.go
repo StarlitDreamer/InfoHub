@@ -16,6 +16,7 @@ const defaultHTTPAddr = ":8080"
 const defaultDedupStorePath = "data/dedup/seen.json"
 const defaultRedisDedupKey = "infohub:dedup:seen"
 const defaultMySQLTable = "reports"
+const defaultMySQLPreferenceTable = "user_preferences"
 const defaultSMTPPort = 25
 const defaultEmailSubject = "InfoHub 每日报告"
 const defaultPreferenceTagWeight = 1.2
@@ -61,6 +62,7 @@ type Config struct {
 	RedisDedupKey           string
 	MySQLDSN                string
 	MySQLTable              string
+	MySQLPreferenceTable    string
 }
 
 // SourceConfig 定义一个可执行的数据源配置。
@@ -167,6 +169,7 @@ func defaultConfig() Config {
 		DedupStorePath:          defaultDedupStorePath,
 		RedisDedupKey:           defaultRedisDedupKey,
 		MySQLTable:              defaultMySQLTable,
+		MySQLPreferenceTable:    defaultMySQLPreferenceTable,
 		SMTPPort:                defaultSMTPPort,
 		EmailSubject:            defaultEmailSubject,
 		PreferenceTagWeight:     defaultPreferenceTagWeight,
@@ -302,6 +305,9 @@ func mergeConfig(base, override Config) Config {
 	if override.MySQLTable != "" {
 		base.MySQLTable = override.MySQLTable
 	}
+	if override.MySQLPreferenceTable != "" {
+		base.MySQLPreferenceTable = override.MySQLPreferenceTable
+	}
 
 	return base
 }
@@ -345,6 +351,7 @@ func applyEnv(cfg Config) Config {
 	cfg.RedisDedupKey = readString("INFOHUB_REDIS_DEDUP_KEY", cfg.RedisDedupKey)
 	cfg.MySQLDSN = readString("INFOHUB_MYSQL_DSN", cfg.MySQLDSN)
 	cfg.MySQLTable = readString("INFOHUB_MYSQL_TABLE", cfg.MySQLTable)
+	cfg.MySQLPreferenceTable = readString("INFOHUB_MYSQL_PREFERENCE_TABLE", cfg.MySQLPreferenceTable)
 
 	return cfg
 }
@@ -408,8 +415,9 @@ type fileConfig struct {
 		DedupKey string `json:"dedup_key"`
 	} `json:"redis"`
 	MySQL struct {
-		DSN   string `json:"dsn"`
-		Table string `json:"table"`
+		DSN             string `json:"dsn"`
+		Table           string `json:"table"`
+		PreferenceTable string `json:"preference_table"`
 	} `json:"mysql"`
 	Scheduler struct {
 		IntervalSeconds int    `json:"interval_seconds"`
@@ -463,6 +471,7 @@ func (f fileConfig) toConfig() Config {
 		RedisDedupKey:           f.Redis.DedupKey,
 		MySQLDSN:                f.MySQL.DSN,
 		MySQLTable:              firstNonEmpty(f.MySQL.Table, defaultMySQLTable),
+		MySQLPreferenceTable:    firstNonEmpty(f.MySQL.PreferenceTable, defaultMySQLPreferenceTable),
 		ReportMaxItems:          f.Report.MaxItems,
 		ReportGroupBySource:     f.Report.GroupBySource,
 	}

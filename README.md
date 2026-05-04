@@ -135,6 +135,7 @@ Common environment variables:
 - `INFOHUB_REDIS_DEDUP_KEY`
 - `INFOHUB_MYSQL_DSN`
 - `INFOHUB_MYSQL_TABLE`
+- `INFOHUB_MYSQL_PREFERENCE_TABLE`
 - `INFOHUB_SCHEDULE_INTERVAL_SECONDS`
 - `INFOHUB_SCHEDULE_CRON`
 
@@ -265,6 +266,8 @@ The MySQL initialization SQL is stored at:
 ```text
 scripts/mysql/init/001_create_reports.sql
 ```
+
+That initialization file now creates both the report table and the user preference table used by the preference APIs.
 
 ## Docker
 

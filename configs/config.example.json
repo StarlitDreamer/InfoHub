@@ -64,7 +64,8 @@
   },
   "mysql": {
     "dsn": "infohub:infohub@tcp(mysql:3306)/infohub?charset=utf8mb4&parseTime=true&loc=Local",
-    "table": "reports"
+    "table": "reports",
+    "preference_table": "user_preferences"
   },
   "scheduler": {
     "interval_seconds": 3600,

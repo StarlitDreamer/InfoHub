@@ -126,7 +126,11 @@ func runServer(cfg config.Config) error {
 	}
 	defer closeRepo()
 
-	preferenceRepo := newUserPreferenceRepository(cfg)
+	preferenceRepo, closePreferenceRepo, err := newUserPreferenceRepository(cfg)
+	if err != nil {
+		return err
+	}
+	defer closePreferenceRepo()
 	router := server.NewRouter(repo, func(ctx context.Context, request server.RunReportRequest) (server.ReportResult, error) {
 		agentRequest := buildAgentRequest(cfg, "http")
 		if request.UserID != "" {
@@ -213,6 +217,15 @@ func mergePreference(base, override service.UserPreference) service.UserPreferen
 	if len(override.Keywords) > 0 {
 		merged.Keywords = append([]string(nil), override.Keywords...)
 	}
+	if override.Weights.TagMatch > 0 {
+		merged.Weights.TagMatch = override.Weights.TagMatch
+	}
+	if override.Weights.SourceMatch > 0 {
+		merged.Weights.SourceMatch = override.Weights.SourceMatch
+	}
+	if override.Weights.KeywordMatch > 0 {
+		merged.Weights.KeywordMatch = override.Weights.KeywordMatch
+	}
 
 	return merged
 }
@@ -274,8 +287,24 @@ func buildSenders(cfg config.Config) []service.MarkdownSender {
 	return senders
 }
 
-func newUserPreferenceRepository(cfg config.Config) repository.UserPreferenceRepository {
-	return repository.NewFileUserPreferenceRepository(filepath.Join(cfg.StorageDir, "preferences", "users.json"))
+func newUserPreferenceRepository(cfg config.Config) (repository.UserPreferenceRepository, func() error, error) {
+	if cfg.UseMySQL() {
+		db, err := sql.Open("mysql", cfg.MySQLDSN)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		repo, err := repository.NewMySQLUserPreferenceRepository(db, cfg.MySQLPreferenceTable)
+		if err != nil {
+			_ = db.Close()
+			return nil, nil, err
+		}
+
+		return repo, repo.Close, nil
+	}
+
+	repo := repository.NewFileUserPreferenceRepository(filepath.Join(cfg.StorageDir, "preferences", "users.json"))
+	return repo, func() error { return nil }, nil
 }
 
 func resolveUserPreference(ctx context.Context, repo repository.UserPreferenceRepository, userID string) (service.UserPreference, error) {
