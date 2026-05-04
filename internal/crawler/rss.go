@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"InfoHub-agent/internal/model"
@@ -72,7 +73,7 @@ func (c *RSSCrawler) Fetch(ctx context.Context) ([]model.NewsItem, error) {
 	items := make([]model.NewsItem, 0, len(feed.Channel.Items))
 	for index, item := range feed.Channel.Items {
 		title := processor.CleanText(item.Title, 200)
-		content := cleanRSSContent(item)
+		content := cleanRSSContent(title, item)
 		source := processor.CleanText(feed.Channel.Title, 100)
 		publishTime := parseRSSDate(item.PubDate, c.options.Now)
 
@@ -106,9 +107,94 @@ type rssItem struct {
 	PubDate     string `xml:"pubDate"`
 }
 
-func cleanRSSContent(item rssItem) string {
-	value := firstNonEmpty(item.Encoded, item.Description, item.Title)
-	return processor.CleanText(value, 4000)
+func cleanRSSContent(title string, item rssItem) string {
+	candidates := []string{
+		trimRepeatedTitle(processor.CleanText(item.Encoded, 4000), title),
+		trimRepeatedTitle(processor.CleanText(item.Description, 4000), title),
+	}
+
+	best := ""
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		if best == "" {
+			best = candidate
+			continue
+		}
+
+		if shouldPreferRSSContent(candidate, best, title) {
+			best = candidate
+		}
+	}
+
+	if best != "" {
+		return best
+	}
+
+	return title
+}
+
+func shouldPreferRSSContent(candidate, currentBest, title string) bool {
+	candidateMatchesTitle := normalizeRSSText(candidate) == normalizeRSSText(title)
+	currentMatchesTitle := normalizeRSSText(currentBest) == normalizeRSSText(title)
+	if candidateMatchesTitle != currentMatchesTitle {
+		return !candidateMatchesTitle
+	}
+
+	return len([]rune(candidate)) > len([]rune(currentBest))
+}
+
+func trimRepeatedTitle(content, title string) string {
+	content = strings.TrimSpace(content)
+	title = strings.TrimSpace(title)
+	if content == "" || title == "" {
+		return content
+	}
+
+	normalizedTitle := normalizeRSSText(title)
+	if normalizeRSSText(content) == normalizedTitle {
+		return ""
+	}
+
+	prefixes := []string{
+		title + " - ",
+		title + " | ",
+		title + ": ",
+		title + " — ",
+	}
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(content, prefix) {
+			content = strings.TrimSpace(strings.TrimPrefix(content, prefix))
+		}
+	}
+
+	suffixes := []string{
+		" - " + title,
+		" | " + title,
+		": " + title,
+		" — " + title,
+	}
+	for _, suffix := range suffixes {
+		if strings.HasSuffix(content, suffix) {
+			content = strings.TrimSpace(strings.TrimSuffix(content, suffix))
+		}
+	}
+
+	if normalizeRSSText(content) == normalizedTitle {
+		return ""
+	}
+
+	return content
+}
+
+func normalizeRSSText(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return ""
+	}
+
+	return strings.Join(strings.Fields(value), " ")
 }
 
 func (c *RSSCrawler) filterItems(items []model.NewsItem) []model.NewsItem {

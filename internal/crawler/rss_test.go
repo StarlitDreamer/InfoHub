@@ -115,6 +115,40 @@ func TestRSSCrawlerPrefersEncodedContent(t *testing.T) {
 	}
 }
 
+func TestRSSCrawlerDropsRepeatedTitleFromContent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`<?xml version="1.0"?>
+<rss xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>测试源</title><item><title>OpenAI releases GPT-5</title><link>https://example.com/a</link><description><![CDATA[OpenAI releases GPT-5 - OpenAI shipped GPT-5 to enterprise teams today.]]></description><pubDate>Sun, 03 May 2026 10:00:00 +0800</pubDate></item></channel></rss>`))
+	}))
+	defer server.Close()
+
+	items, err := NewRSSCrawler(server.URL, server.Client(), nil, RSSOptions{}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("fetch failed: %v", err)
+	}
+	if len(items) != 1 || items[0].Content != "OpenAI shipped GPT-5 to enterprise teams today." {
+		t.Fatalf("expected repeated title to be trimmed, got %+v", items)
+	}
+}
+
+func TestRSSCrawlerFallsBackToDescriptionWhenEncodedIsOnlyTitle(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`<?xml version="1.0"?>
+<rss xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>测试源</title><item><title>标题一</title><link>https://example.com/a</link><description>这是更完整的摘要内容</description><content:encoded><![CDATA[<div><p>标题一</p></div>]]></content:encoded><pubDate>Sun, 03 May 2026 10:00:00 +0800</pubDate></item></channel></rss>`))
+	}))
+	defer server.Close()
+
+	items, err := NewRSSCrawler(server.URL, server.Client(), nil, RSSOptions{}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("fetch failed: %v", err)
+	}
+	if len(items) != 1 || items[0].Content != "这是更完整的摘要内容" {
+		t.Fatalf("expected description fallback when encoded is only title, got %+v", items)
+	}
+}
+
 func TestRSSCrawlerRespectsCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
