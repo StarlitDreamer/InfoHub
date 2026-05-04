@@ -40,6 +40,7 @@ type Config struct {
 	EmailTo             []string
 	EmailSubject        string
 	ScheduleInterval    time.Duration
+	ScheduleCron        string
 	StorageDir          string
 	HTTPAddr            string
 	DedupStorePath      string
@@ -232,6 +233,9 @@ func mergeConfig(base, override Config) Config {
 	if override.EmailSubject != "" {
 		base.EmailSubject = override.EmailSubject
 	}
+	if override.ScheduleCron != "" {
+		base.ScheduleCron = override.ScheduleCron
+	}
 	if override.ScheduleInterval != 0 {
 		base.ScheduleInterval = override.ScheduleInterval
 	}
@@ -292,6 +296,7 @@ func applyEnv(cfg Config) Config {
 	cfg.EmailFrom = readString("INFOHUB_EMAIL_FROM", cfg.EmailFrom)
 	cfg.EmailTo = readList("INFOHUB_EMAIL_TO", strings.Join(cfg.EmailTo, ","))
 	cfg.EmailSubject = readString("INFOHUB_EMAIL_SUBJECT", cfg.EmailSubject)
+	cfg.ScheduleCron = readString("INFOHUB_SCHEDULE_CRON", cfg.ScheduleCron)
 	cfg.ScheduleInterval = readDuration("INFOHUB_SCHEDULE_INTERVAL_SECONDS", cfg.ScheduleInterval)
 	cfg.StorageDir = readString("INFOHUB_STORAGE_DIR", cfg.StorageDir)
 	cfg.HTTPAddr = readString("INFOHUB_HTTP_ADDR", cfg.HTTPAddr)
@@ -361,7 +366,8 @@ type fileConfig struct {
 		Table string `json:"table"`
 	} `json:"mysql"`
 	Scheduler struct {
-		IntervalSeconds int `json:"interval_seconds"`
+		IntervalSeconds int    `json:"interval_seconds"`
+		Cron            string `json:"cron"`
 	} `json:"scheduler"`
 }
 
@@ -394,6 +400,7 @@ func (f fileConfig) toConfig() Config {
 		EmailTo:             append([]string(nil), f.Email.To...),
 		EmailSubject:        firstNonEmpty(f.Email.Subject, defaultEmailSubject),
 		SendEmptyReport:     f.Webhook.SendEmptyReport,
+		ScheduleCron:        f.Scheduler.Cron,
 		StorageDir:          f.Storage.Dir,
 		HTTPAddr:            f.HTTP.Addr,
 		DedupStorePath:      f.Dedup.StorePath,

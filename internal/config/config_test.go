@@ -24,6 +24,7 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("INFOHUB_EMAIL_FROM", "robot@example.com")
 	t.Setenv("INFOHUB_EMAIL_TO", "alice@example.com,bob@example.com")
 	t.Setenv("INFOHUB_EMAIL_SUBJECT", "日报")
+	t.Setenv("INFOHUB_SCHEDULE_CRON", "*/15 * * * *")
 	t.Setenv("INFOHUB_SCHEDULE_INTERVAL_SECONDS", "120")
 	t.Setenv("INFOHUB_STORAGE_DIR", "tmp/reports")
 	t.Setenv("INFOHUB_HTTP_ADDR", ":9090")
@@ -65,6 +66,9 @@ func TestLoadFromEnv(t *testing.T) {
 	}
 	if cfg.ScheduleInterval != 120*time.Second {
 		t.Fatalf("expected 120s schedule interval, got %s", cfg.ScheduleInterval)
+	}
+	if cfg.ScheduleCron != "*/15 * * * *" {
+		t.Fatalf("expected cron schedule, got %s", cfg.ScheduleCron)
 	}
 	if cfg.StorageDir != "tmp/reports" {
 		t.Fatalf("expected storage dir tmp/reports, got %s", cfg.StorageDir)
@@ -145,7 +149,7 @@ func TestLoadFromJSONFile(t *testing.T) {
   "auth": {"token": "file-token"},
   "redis": {"addr": "redis:6379", "password": "file-secret", "db": 1, "dedup_key": "file:dedup"},
   "mysql": {"dsn": "user:pass@tcp(mysql:3306)/infohub?parseTime=true", "table": "report_records"},
-  "scheduler": {"interval_seconds": 300}
+  "scheduler": {"interval_seconds": 300, "cron": "0 9 * * 1-5"}
 }`
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatalf("failed to write test config: %v", err)
@@ -180,6 +184,9 @@ func TestLoadFromJSONFile(t *testing.T) {
 	}
 	if cfg.ScheduleInterval != 300*time.Second {
 		t.Fatalf("expected 300s interval, got %s", cfg.ScheduleInterval)
+	}
+	if cfg.ScheduleCron != "0 9 * * 1-5" {
+		t.Fatalf("expected cron schedule from file, got %s", cfg.ScheduleCron)
 	}
 	if cfg.AuthToken != "file-token" {
 		t.Fatalf("expected file auth token, got %s", cfg.AuthToken)

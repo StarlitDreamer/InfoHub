@@ -226,6 +226,28 @@ func TestNewCrawlerFallsBackToDemoWhenSourceBuildFails(t *testing.T) {
 	}
 }
 
+func TestBuildSchedulerUsesCronWhenConfigured(t *testing.T) {
+	task, err := buildScheduler(config.Config{
+		ScheduleCron:     "*/10 * * * *",
+		ScheduleInterval: time.Hour,
+	}, func(context.Context) error { return nil })
+	if err != nil {
+		t.Fatalf("expected cron scheduler to build, got %v", err)
+	}
+	if task == nil {
+		t.Fatal("expected scheduler instance")
+	}
+}
+
+func TestBuildSchedulerRejectsInvalidCron(t *testing.T) {
+	_, err := buildScheduler(config.Config{
+		ScheduleCron: "invalid-cron",
+	}, func(context.Context) error { return nil })
+	if err == nil {
+		t.Fatal("expected invalid cron to fail")
+	}
+}
+
 type captureReportRepository struct {
 	saveCalls int
 	record    repository.ReportRecord

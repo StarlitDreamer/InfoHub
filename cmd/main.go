@@ -98,7 +98,10 @@ func runSchedule(ctx context.Context, cfg config.Config) error {
 		_, err := runReport(ctx, cfg, "schedule")
 		return err
 	}
-	task := scheduler.New(cfg.ScheduleInterval, job)
+	task, err := buildScheduler(cfg, job)
+	if err != nil {
+		return err
+	}
 
 	if err := task.RunOnce(ctx); err != nil {
 		return err
@@ -202,6 +205,14 @@ func newReportRepository(cfg config.Config) (repository.ReportRepository, func()
 
 	repo := repository.NewFileReportRepository(cfg.StorageDir)
 	return repo, func() error { return nil }, nil
+}
+
+func buildScheduler(cfg config.Config, job scheduler.Job) (*scheduler.Scheduler, error) {
+	if cfg.ScheduleCron != "" {
+		return scheduler.NewCron(cfg.ScheduleCron, job)
+	}
+
+	return scheduler.New(cfg.ScheduleInterval, job), nil
 }
 
 func buildSenders(cfg config.Config) []service.MarkdownSender {

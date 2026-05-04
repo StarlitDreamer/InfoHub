@@ -65,6 +65,8 @@ Start scheduler mode:
 go run cmd/main.go schedule
 ```
 
+The scheduler supports either a fixed interval via `INFOHUB_SCHEDULE_INTERVAL_SECONDS` or a 5-field cron expression via `INFOHUB_SCHEDULE_CRON`, for example `0 9,18 * * 1-5`.
+
 Start HTTP server:
 
 ```bash
@@ -128,6 +130,7 @@ Common environment variables:
 - `INFOHUB_MYSQL_DSN`
 - `INFOHUB_MYSQL_TABLE`
 - `INFOHUB_SCHEDULE_INTERVAL_SECONDS`
+- `INFOHUB_SCHEDULE_CRON`
 
 Source config can also use an explicit `sources` array in JSON:
 

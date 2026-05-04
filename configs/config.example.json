@@ -49,6 +49,7 @@
     "table": "reports"
   },
   "scheduler": {
-    "interval_seconds": 3600
+    "interval_seconds": 3600,
+    "cron": "0 9,18 * * 1-5"
   }
 }
