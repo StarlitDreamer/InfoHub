@@ -41,6 +41,13 @@ Run tests:
 go test ./...
 ```
 
+If your machine cannot use the default Go build cache directory, set `GOCACHE` inside the workspace first:
+
+```powershell
+$env:GOCACHE="D:\code\go\InfoHub\.gocache"
+go test ./...
+```
+
 Run the MySQL integration test against the local Compose database:
 
 ```bash
@@ -75,6 +82,48 @@ go run cmd/main.go serve
 
 If no mode is passed, the app defaults to `run-once`.
 
+## Verification flows
+
+### 1. Fast local verification with mock AI and file storage
+
+This is the safest host-side verification path because it avoids MySQL and only writes local files:
+
+```powershell
+$env:GOCACHE="D:\code\go\InfoHub\.gocache"
+$env:INFOHUB_RSS_URLS="https://blog.google/rss/,https://openai.com/news/rss.xml"
+$env:INFOHUB_RSS_MAX_ITEMS_PER_FEED="15"
+$env:INFOHUB_RSS_RECENT_WITHIN_HOURS="168"
+$env:INFOHUB_REPORT_MAX_ITEMS="12"
+$env:INFOHUB_STORAGE_DIR="D:\code\go\InfoHub\data\reports-verify"
+$env:INFOHUB_DEDUP_STORE_PATH="D:\code\go\InfoHub\data\dedup\verify-seen.json"
+go run cmd\main.go run-once
+```
+
+This path uses:
+
+- real RSS feeds
+- mock AI scoring and summaries
+- file-backed report storage
+- a temporary dedup file for repeatable verification
+
+### 2. Docker Compose verification
+
+Use Docker Compose when you want the full local stack, including MySQL and Redis:
+
+```bash
+docker compose up --build
+```
+
+### 3. Real AI verification
+
+To verify with a real OpenAI-compatible endpoint, set:
+
+- `INFOHUB_AI_ENDPOINT`
+- `INFOHUB_AI_API_KEY`
+- `INFOHUB_AI_MODEL`
+
+If any of those are missing, the app falls back to the built-in mock AI processor.
+
 ## Configuration
 
 Use the bundled JSON example:
@@ -98,6 +147,12 @@ The example files are:
 For local RSS verification without touching the example config, use:
 
 - `configs/config.local.json`
+
+Important note:
+
+- `configs/config.local.json` includes a MySQL DSN for the Docker Compose network: `mysql:3306`
+- that file is ideal inside Docker Compose
+- on the host machine, prefer pure environment variables or explicitly clear `INFOHUB_MYSQL_DSN` if you want file storage only
 
 Common environment variables:
 
@@ -255,6 +310,11 @@ data/dedup/seen.json
 
 Set `INFOHUB_MYSQL_DSN` to enable MySQL-backed report storage. If it is empty, the app uses file storage.
 
+When you run on the host machine, do not point `INFOHUB_MYSQL_DSN` at the Docker-internal hostname `mysql:3306`. Use either:
+
+- an empty DSN for file storage
+- `localhost:3307` when the Compose database is exposed to the host
+
 Default table name:
 
 ```text
@@ -373,13 +433,14 @@ This keeps the normal runtime dedup state untouched while generating a fresh rep
 
 ## Current limitations
 
-- RSS parsing focuses on common fields and does not yet do deeper HTML extraction.
+- Mock AI mode uses heuristic tagging, scoring, and structured summaries. It is useful for local verification, but it is not a substitute for real LLM output quality.
 - Real AI summaries depend on an OpenAI-compatible endpoint.
 - Redis dedup does not yet implement TTL or date partitioning.
 - Public deployment should still sit behind a reverse proxy.
+- Partial source failures are surfaced in the report overview, but there is not yet a richer retry or alerting layer.
 
 ## Suggested next steps
 
-- Improve RSS HTML cleaning and content extraction
 - Add production reverse proxy and HTTPS examples
-- Add MySQL integration tests against a real container
+- Add richer source health monitoring and retry strategy
+- Refine real AI prompt quality and scoring calibration with production samples
