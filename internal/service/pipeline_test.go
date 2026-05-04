@@ -130,6 +130,29 @@ func TestPipelineMergesSimilarEventsWithinRun(t *testing.T) {
 	}
 }
 
+func TestPipelineSortsItemsByScoreAndPublishTime(t *testing.T) {
+	baseTime := time.Date(2026, 5, 4, 10, 0, 0, 0, time.UTC)
+	pipeline := NewPipeline(
+		staticServiceCrawler{items: []model.NewsItem{
+			{Title: "older high score", Content: "a", PublishTime: baseTime, Score: 1},
+			{Title: "latest same score", Content: "b", PublishTime: baseTime.Add(2 * time.Hour), Score: 1},
+			{Title: "highest score", Content: "c", PublishTime: baseTime.Add(-1 * time.Hour), Score: 1},
+		}},
+		sortingAI{},
+	)
+
+	result, err := pipeline.RunContext(context.Background())
+	if err != nil {
+		t.Fatalf("pipeline run failed: %v", err)
+	}
+	if len(result) != 3 {
+		t.Fatalf("expected 3 items, got %d", len(result))
+	}
+	if result[0].Title != "highest score" || result[1].Title != "latest same score" || result[2].Title != "older high score" {
+		t.Fatalf("expected items to be sorted by score then publish time, got %+v", result)
+	}
+}
+
 func TestPipelineFillsTagsSummaryAndScoreFromAI(t *testing.T) {
 	item := model.NewsItem{
 		Title:       "test title",
@@ -155,7 +178,7 @@ func TestPipelineFillsTagsSummaryAndScoreFromAI(t *testing.T) {
 	if len(summarized.Tags) != 2 || summarized.Tags[0] != "AI" {
 		t.Fatalf("expected ai tags to be applied, got %+v", summarized.Tags)
 	}
-	if !strings.Contains(summarized.Content, "test title") {
+	if !strings.Contains(summarized.Content, "【标题】test title") {
 		t.Fatalf("expected structured summary from ai, got %s", summarized.Content)
 	}
 	if summarized.Score != 4 {
@@ -265,4 +288,23 @@ func (a emptyAI) Summarize(item model.NewsItem) (string, error) {
 
 func (a emptyAI) Score(item model.NewsItem) (float64, error) {
 	return 0, nil
+}
+
+type sortingAI struct{}
+
+func (a sortingAI) Classify(item model.NewsItem) ([]string, error) {
+	return nil, nil
+}
+
+func (a sortingAI) Summarize(item model.NewsItem) (string, error) {
+	return item.Content, nil
+}
+
+func (a sortingAI) Score(item model.NewsItem) (float64, error) {
+	switch item.Title {
+	case "highest score":
+		return 5, nil
+	default:
+		return 3, nil
+	}
 }

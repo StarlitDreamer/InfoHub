@@ -21,7 +21,7 @@ func TestRenderMarkdownIncludesOverviewAndDecisionFields(t *testing.T) {
 		},
 	})
 
-	if !strings.Contains(report, "# 今日信息") {
+	if !strings.Contains(report, "# 今日信息日报") {
 		t.Fatal("expected markdown to include report heading")
 	}
 	if !strings.Contains(report, "## 今日概览") {
@@ -39,7 +39,7 @@ func TestRenderMarkdownIncludesOverviewAndDecisionFields(t *testing.T) {
 	if !strings.Contains(report, "- 为什么重要：important") {
 		t.Fatal("expected markdown to include importance field")
 	}
-	if !strings.Contains(report, "- 建议动作：加入近期待办") {
+	if !strings.Contains(report, "- 建议动作：加入近期待办，指定负责人跟进原文和后续进展。") {
 		t.Fatal("expected markdown to include suggested action")
 	}
 	if !strings.Contains(report, "- 原文链接：https://example.com/item") {
@@ -78,7 +78,7 @@ func TestRenderMarkdownFallsBackForPlainSummary(t *testing.T) {
 	if !strings.Contains(report, "- 发生了什么：plain summary") {
 		t.Fatalf("expected plain summary fallback, got %s", report)
 	}
-	if !strings.Contains(report, "- 为什么重要：该信息可能影响后续判断") {
+	if !strings.Contains(report, "- 为什么重要：该信息可能影响后续判断，建议结合业务上下文继续关注。") {
 		t.Fatalf("expected default importance fallback, got %s", report)
 	}
 }

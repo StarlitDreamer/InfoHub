@@ -21,7 +21,7 @@ func RenderMarkdownBySource(items []model.NewsItem) string {
 
 func renderMarkdown(items []model.NewsItem, groupBySource bool) string {
 	var builder strings.Builder
-	builder.WriteString("# 今日信息\n\n")
+	builder.WriteString("# 今日信息日报\n\n")
 
 	if len(items) == 0 {
 		builder.WriteString("今日暂无新增信息。\n")

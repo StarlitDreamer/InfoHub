@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"InfoHub-agent/internal/ai"
@@ -78,6 +79,7 @@ func (p *Pipeline) RunContext(ctx context.Context) ([]model.NewsItem, error) {
 		result = append(result, summarized)
 	}
 
+	sortNewsItemsByScore(result)
 	return result, nil
 }
 
@@ -153,4 +155,23 @@ func fallbackSummary(item model.NewsItem, score float64) string {
 		content,
 		normalizedScore,
 	)
+}
+
+func sortNewsItemsByScore(items []model.NewsItem) {
+	sort.SliceStable(items, func(i, j int) bool {
+		left := items[i]
+		right := items[j]
+
+		if left.Score != right.Score {
+			return left.Score > right.Score
+		}
+		if !left.PublishTime.Equal(right.PublishTime) {
+			return left.PublishTime.After(right.PublishTime)
+		}
+		if left.Title != right.Title {
+			return strings.Compare(left.Title, right.Title) < 0
+		}
+
+		return strings.Compare(left.URL, right.URL) < 0
+	})
 }
