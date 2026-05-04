@@ -138,14 +138,35 @@ func TestLatestReport(t *testing.T) {
 	}
 
 	body := recorder.Body.String()
-	if !strings.Contains(body, `"display_count":2`) {
-		t.Fatalf("expected latest report response to include display_count, got %s", body)
+	if !strings.Contains(body, `"display_count":2`) || !strings.Contains(body, `"high_priority_count":1`) {
+		t.Fatalf("expected latest report response to include overview counts, got %s", body)
 	}
 	if !strings.Contains(body, `"decision_summary"`) || !strings.Contains(body, `"top_priority_items"`) {
 		t.Fatalf("expected latest report response to include summary fields, got %s", body)
 	}
 	if !strings.Contains(body, `"action":"近期跟进"`) || !strings.Contains(body, `"summary":"summary one"`) {
 		t.Fatalf("expected latest report response to include decision summary details, got %s", body)
+	}
+}
+
+func TestBuildReportOverviewUsesSharedSummaryRules(t *testing.T) {
+	overview := buildReportOverview(
+		"# 今日信息日报\n\n## 今日概览\n- 收录条目：2\n\n## ⭐⭐ 测试一\nbody\n\n## ⭐ 测试二\nbody\n",
+		[]model.NewsItem{
+			{Title: "测试一", Score: 5, Content: "【发生了什么】summary one"},
+			{Title: "测试二", Score: 2, Content: "plain summary two"},
+		},
+		2,
+	)
+
+	if overview.DisplayCount != 2 || overview.HighPriorityCount != 1 {
+		t.Fatalf("expected shared overview counts, got %+v", overview)
+	}
+	if len(overview.TopPriorityItems) != 2 || overview.TopPriorityItems[0] != "测试一" {
+		t.Fatalf("expected shared top titles, got %+v", overview.TopPriorityItems)
+	}
+	if len(overview.DecisionSummary) != 2 || overview.DecisionSummary[0].Action != "立即评审" {
+		t.Fatalf("expected shared decision summary, got %+v", overview.DecisionSummary)
 	}
 }
 
@@ -364,12 +385,13 @@ func (r *memoryRepository) Latest(ctx context.Context) (repository.ReportRecord,
 func (r *memoryRepository) List(ctx context.Context) ([]repository.ReportMetadata, error) {
 	result := make([]repository.ReportMetadata, 0, len(r.records))
 	for _, record := range r.records {
+		overview := buildReportOverview(record.Markdown, record.Items, 2)
 		result = append(result, repository.ReportMetadata{
 			Name:              record.GeneratedAt.Format("20060102-150405"),
 			ItemCount:         len(record.Items),
-			DisplayCount:      repository.CountDisplayItems(record.Markdown),
-			HighPriorityCount: repository.CountHighPriorityItems(record.Items),
-			TopTitles:         repository.TopTitles(record.Items, 2),
+			DisplayCount:      overview.DisplayCount,
+			HighPriorityCount: overview.HighPriorityCount,
+			TopTitles:         overview.TopPriorityItems,
 			CreatedAt:         record.GeneratedAt,
 		})
 	}

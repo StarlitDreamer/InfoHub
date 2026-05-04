@@ -56,6 +56,13 @@ type reportDecisionSummary struct {
 	Summary string   `json:"summary"`
 }
 
+type reportOverview struct {
+	DisplayCount      int                     `json:"display_count"`
+	HighPriorityCount int                     `json:"high_priority_count"`
+	TopPriorityItems  []string                `json:"top_priority_items"`
+	DecisionSummary   []reportDecisionSummary `json:"decision_summary"`
+}
+
 // NewRouter 创建 HTTP 路由。
 func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Options) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
@@ -160,13 +167,15 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Op
 			return
 		}
 
+		overview := buildReportOverview(record.Markdown, record.Items, 3)
 		ctx.JSON(http.StatusOK, gin.H{
-			"generated_at":       record.GeneratedAt,
-			"markdown":           record.Markdown,
-			"items":              record.Items,
-			"display_count":      repository.CountDisplayItems(record.Markdown),
-			"decision_summary":   buildDecisionSummary(record.Items, 3),
-			"top_priority_items": repository.TopTitles(record.Items, 3),
+			"generated_at":        record.GeneratedAt,
+			"markdown":            record.Markdown,
+			"items":               record.Items,
+			"display_count":       overview.DisplayCount,
+			"high_priority_count": overview.HighPriorityCount,
+			"decision_summary":    overview.DecisionSummary,
+			"top_priority_items":  overview.TopPriorityItems,
 		})
 	})
 
@@ -212,6 +221,15 @@ func (r PreferenceRequest) ToUserPreference() service.UserPreference {
 			SourceMatch:  r.Weights.Source,
 			KeywordMatch: r.Weights.Keyword,
 		},
+	}
+}
+
+func buildReportOverview(markdown string, items []model.NewsItem, limit int) reportOverview {
+	return reportOverview{
+		DisplayCount:      repository.CountDisplayItems(markdown),
+		HighPriorityCount: repository.CountHighPriorityItems(items),
+		TopPriorityItems:  repository.TopTitles(items, limit),
+		DecisionSummary:   buildDecisionSummary(items, limit),
 	}
 }
 
