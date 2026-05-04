@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"InfoHub-agent/internal/model"
+	"InfoHub-agent/internal/summary"
 )
 
 // RenderMarkdown 将信息列表渲染为 Markdown 日报。
@@ -82,11 +83,11 @@ func renderGroupedItems(builder *strings.Builder, items []model.NewsItem) {
 }
 
 func renderItem(builder *strings.Builder, item model.NewsItem) {
-	summary := parseStructuredSummary(item)
-	action := recommendAction(item, summary)
+	parsed := summary.Parse(item)
+	action := recommendAction(item, parsed)
 
-	builder.WriteString(fmt.Sprintf("## %s %s\n", scoreStars(item.Score), summary.Title))
-	builder.WriteString(fmt.Sprintf("- 标题：%s\n", summary.Title))
+	builder.WriteString(fmt.Sprintf("## %s %s\n", scoreStars(item.Score), parsed.Title))
+	builder.WriteString(fmt.Sprintf("- 标题：%s\n", parsed.Title))
 	builder.WriteString(fmt.Sprintf("- 来源：%s\n", normalizeSource(item.Source)))
 	if !item.PublishTime.IsZero() {
 		builder.WriteString(fmt.Sprintf("- 时间：%s\n", item.PublishTime.Format("2006-01-02 15:04")))
@@ -94,9 +95,9 @@ func renderItem(builder *strings.Builder, item model.NewsItem) {
 	if len(item.Tags) > 0 {
 		builder.WriteString(fmt.Sprintf("- 标签：%s\n", strings.Join(item.Tags, "、")))
 	}
-	builder.WriteString(fmt.Sprintf("- 发生了什么：%s\n", summary.WhatHappened))
-	builder.WriteString(fmt.Sprintf("- 为什么重要：%s\n", summary.WhyImportant))
-	builder.WriteString(fmt.Sprintf("- 影响：%s\n", summary.Impact))
+	builder.WriteString(fmt.Sprintf("- 发生了什么：%s\n", parsed.WhatHappened))
+	builder.WriteString(fmt.Sprintf("- 为什么重要：%s\n", parsed.WhyImportant))
+	builder.WriteString(fmt.Sprintf("- 影响：%s\n", parsed.Impact))
 	builder.WriteString(fmt.Sprintf("- 建议动作：%s\n", action))
 	builder.WriteString(fmt.Sprintf("- 评分：%.0f/5\n", clampScore(item.Score)))
 	if item.URL != "" {
@@ -105,48 +106,9 @@ func renderItem(builder *strings.Builder, item model.NewsItem) {
 	builder.WriteString("\n")
 }
 
-type structuredSummary struct {
-	Title        string
-	WhatHappened string
-	WhyImportant string
-	Impact       string
-}
-
-func parseStructuredSummary(item model.NewsItem) structuredSummary {
-	summary := structuredSummary{
-		Title:        strings.TrimSpace(item.Title),
-		WhatHappened: strings.TrimSpace(item.Content),
-		WhyImportant: "该信息可能影响后续判断，建议结合业务上下文继续关注。",
-		Impact:       "建议评估是否需要跟进、验证或纳入后续决策。",
-	}
-
-	for _, rawLine := range strings.Split(item.Content, "\n") {
-		line := strings.TrimSpace(rawLine)
-		switch {
-		case strings.HasPrefix(line, "【标题】"):
-			summary.Title = strings.TrimSpace(strings.TrimPrefix(line, "【标题】"))
-		case strings.HasPrefix(line, "【发生了什么】"):
-			summary.WhatHappened = strings.TrimSpace(strings.TrimPrefix(line, "【发生了什么】"))
-		case strings.HasPrefix(line, "【为什么重要】"):
-			summary.WhyImportant = strings.TrimSpace(strings.TrimPrefix(line, "【为什么重要】"))
-		case strings.HasPrefix(line, "【影响】"):
-			summary.Impact = strings.TrimSpace(strings.TrimPrefix(line, "【影响】"))
-		}
-	}
-
-	if summary.Title == "" {
-		summary.Title = "未命名信息"
-	}
-	if summary.WhatHappened == "" {
-		summary.WhatHappened = summary.Title
-	}
-
-	return summary
-}
-
-func recommendAction(item model.NewsItem, summary structuredSummary) string {
+func recommendAction(item model.NewsItem, parsed summary.Structured) string {
 	score := clampScore(item.Score)
-	text := strings.ToLower(strings.Join(item.Tags, " ") + " " + item.Title + " " + summary.WhyImportant + " " + summary.Impact)
+	text := strings.ToLower(strings.Join(item.Tags, " ") + " " + item.Title + " " + parsed.WhyImportant + " " + parsed.Impact)
 
 	switch {
 	case score >= 5:
@@ -172,7 +134,7 @@ func summarizePriorityActions(items []model.NewsItem, limit int) []string {
 	actions := make([]string, 0, limit)
 	seen := make(map[string]struct{})
 	for _, item := range items {
-		action := recommendAction(item, parseStructuredSummary(item))
+		action := recommendAction(item, summary.Parse(item))
 		if _, ok := seen[action]; ok {
 			continue
 		}

@@ -12,6 +12,7 @@ import (
 	"InfoHub-agent/internal/model"
 	"InfoHub-agent/internal/repository"
 	"InfoHub-agent/internal/service"
+	"InfoHub-agent/internal/summary"
 )
 
 // ReportRunner 表示可被 HTTP 触发的日报生成任务。
@@ -244,13 +245,14 @@ func buildDecisionSummary(items []model.NewsItem, limit int) []reportDecisionSum
 
 	result := make([]reportDecisionSummary, 0, len(items))
 	for _, item := range items {
+		parsed := summary.Parse(item)
 		result = append(result, reportDecisionSummary{
-			Title:   strings.TrimSpace(item.Title),
+			Title:   parsed.Title,
 			Source:  normalizeSource(item),
 			Score:   item.Score,
 			Tags:    append([]string(nil), item.Tags...),
 			Action:  summarizeAction(item),
-			Summary: summarizeWhatHappened(item),
+			Summary: parsed.WhatHappened,
 		})
 	}
 
@@ -275,26 +277,6 @@ func summarizeAction(item model.NewsItem) string {
 	default:
 		return "持续观察"
 	}
-}
-
-func summarizeWhatHappened(item model.NewsItem) string {
-	for _, rawLine := range strings.Split(item.Content, "\n") {
-		line := strings.TrimSpace(rawLine)
-		if strings.HasPrefix(line, "【发生了什么】") {
-			value := strings.TrimSpace(strings.TrimPrefix(line, "【发生了什么】"))
-			if value != "" {
-				return value
-			}
-		}
-	}
-
-	content := strings.TrimSpace(item.Content)
-	if content == "" {
-		return strings.TrimSpace(item.Title)
-	}
-
-	lines := strings.Split(content, "\n")
-	return strings.TrimSpace(lines[0])
 }
 
 func normalizeSource(item model.NewsItem) string {

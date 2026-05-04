@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"InfoHub-agent/internal/model"
+	"InfoHub-agent/internal/summary"
 )
 
 func TestRenderMarkdownIncludesOverviewAndDecisionFields(t *testing.T) {
@@ -118,14 +119,14 @@ func TestSummarizePriorityActionsDeduplicates(t *testing.T) {
 }
 
 func TestRecommendActionUsesScoreAndTopicSignals(t *testing.T) {
-	high := recommendAction(model.NewsItem{Score: 5}, structuredSummary{})
+	high := recommendAction(model.NewsItem{Score: 5}, summary.Structured{})
 	if !strings.Contains(high, "优先安排评审") {
 		t.Fatalf("expected top score action, got %s", high)
 	}
 
 	database := recommendAction(
 		model.NewsItem{Score: 3, Tags: []string{"Database"}},
-		structuredSummary{WhyImportant: "数据库性能值得关注"},
+		summary.Structured{WhyImportant: "数据库性能值得关注"},
 	)
 	if !strings.Contains(database, "专项验证") {
 		t.Fatalf("expected database action, got %s", database)
