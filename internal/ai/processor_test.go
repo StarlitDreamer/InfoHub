@@ -58,6 +58,52 @@ func TestMockProcessorImplementsSplitCapabilities(t *testing.T) {
 	}
 }
 
+func TestMockProcessorPrioritizesSecurityAndPlatformSignals(t *testing.T) {
+	processor := NewMockProcessor()
+
+	securityScore, err := processor.Score(model.NewsItem{
+		Title:   "Introducing Advanced Account Security",
+		Content: "phishing-resistant login and stronger recovery for enterprise accounts",
+		Source:  "OpenAI News",
+	})
+	if err != nil {
+		t.Fatalf("security score failed: %v", err)
+	}
+
+	lifestyleScore, err := processor.Score(model.NewsItem{
+		Title:   "A new way to create a digital wardrobe from your Google Photos",
+		Content: "A new Google Photos feature catalogs the clothes in your wardrobe.",
+		Source:  "The Keyword",
+	})
+	if err != nil {
+		t.Fatalf("lifestyle score failed: %v", err)
+	}
+
+	if securityScore <= lifestyleScore {
+		t.Fatalf("expected security item to outrank lifestyle item, got %.1f <= %.1f", securityScore, lifestyleScore)
+	}
+}
+
+func TestMockProcessorAddsSecurityAndCloudTags(t *testing.T) {
+	processor := NewMockProcessor()
+
+	tags, err := processor.Classify(model.NewsItem{
+		Title:   "OpenAI models and API come to AWS",
+		Content: "enterprise customers can deploy models in their cloud environments with stronger security controls",
+		Source:  "OpenAI News",
+	})
+	if err != nil {
+		t.Fatalf("classify failed: %v", err)
+	}
+
+	if len(tags) < 3 {
+		t.Fatalf("expected multiple tags, got %+v", tags)
+	}
+	if tags[0] != "AI" || tags[1] != "Security" || tags[2] != "Cloud" {
+		t.Fatalf("unexpected tags: %+v", tags)
+	}
+}
+
 type analyzerStub struct {
 	analysis     Analysis
 	analyzeCalls int
