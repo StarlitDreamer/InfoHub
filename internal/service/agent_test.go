@@ -77,6 +77,9 @@ func TestAgentRunWithRequestCarriesExecutionContext(t *testing.T) {
 			Sources: []Source{
 				{Name: "feed-a", Kind: "rss", Location: "https://example.com/a.xml"},
 			},
+			Preference: UserPreference{
+				Tags: []string{"AI"},
+			},
 		},
 	})
 	if err != nil {
@@ -91,6 +94,9 @@ func TestAgentRunWithRequestCarriesExecutionContext(t *testing.T) {
 	}
 	if len(result.Request.Context.Sources) != 1 || result.Request.Context.Sources[0].Kind != "rss" {
 		t.Fatalf("unexpected sources: %+v", result.Request.Context.Sources)
+	}
+	if len(result.Request.Context.Preference.Tags) != 1 || result.Request.Context.Preference.Tags[0] != "AI" {
+		t.Fatalf("unexpected preference: %+v", result.Request.Context.Preference)
 	}
 }
 
@@ -183,6 +189,40 @@ func TestAgentRunAppliesSourcePriorityAndReportFilter(t *testing.T) {
 	}
 	if result.DisplayCount != 2 {
 		t.Fatalf("expected display count 2 after source filter, got %d", result.DisplayCount)
+	}
+}
+
+func TestAgentRunAppliesPreferenceBoostBeforeSourcePriority(t *testing.T) {
+	fixedNow := time.Date(2026, 5, 3, 20, 0, 0, 0, time.UTC)
+	repo := &agentRepositoryStub{}
+	agent := NewAgent(
+		staticPipelineRunner{
+			items: []model.NewsItem{
+				{SourceName: "normal", Title: "数据库更新", Content: "summary a", Tags: []string{"数据库"}, Score: 4.5, PublishTime: fixedNow.Add(-1 * time.Hour)},
+				{SourceName: "preferred", Title: "AI Agent 更新", Content: "新增编排能力", Tags: []string{"AI", "Agent"}, Score: 3.2, PublishTime: fixedNow.Add(-2 * time.Hour)},
+			},
+		},
+		repo,
+		AgentOptions{
+			Now: func() time.Time { return fixedNow },
+		},
+	)
+
+	result, err := agent.RunWithRequest(context.Background(), AgentRequest{
+		Context: ExecutionContext{
+			Preference: UserPreference{
+				Tags:     []string{"AI", "Agent"},
+				Sources:  []string{"preferred"},
+				Keywords: []string{"编排"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("agent run failed: %v", err)
+	}
+
+	if len(result.Items) != 2 || result.Items[0].SourceName != "preferred" {
+		t.Fatalf("expected preferred item to sort first, got %+v", result.Items)
 	}
 }
 

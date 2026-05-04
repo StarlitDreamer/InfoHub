@@ -174,6 +174,11 @@ func buildAgentRequest(cfg config.Config, trigger string) service.AgentRequest {
 		Context: service.ExecutionContext{
 			Trigger: trigger,
 			Sources: sources,
+			Preference: service.UserPreference{
+				Tags:     append([]string(nil), cfg.PreferenceTags...),
+				Sources:  append([]string(nil), cfg.PreferenceSources...),
+				Keywords: append([]string(nil), cfg.PreferenceKeywords...),
+			},
 		},
 	}
 }

@@ -39,6 +39,9 @@ type Config struct {
 	EmailFrom           string
 	EmailTo             []string
 	EmailSubject        string
+	PreferenceTags      []string
+	PreferenceSources   []string
+	PreferenceKeywords  []string
 	ScheduleInterval    time.Duration
 	ScheduleCron        string
 	StorageDir          string
@@ -233,6 +236,15 @@ func mergeConfig(base, override Config) Config {
 	if override.EmailSubject != "" {
 		base.EmailSubject = override.EmailSubject
 	}
+	if len(override.PreferenceTags) > 0 {
+		base.PreferenceTags = override.PreferenceTags
+	}
+	if len(override.PreferenceSources) > 0 {
+		base.PreferenceSources = override.PreferenceSources
+	}
+	if len(override.PreferenceKeywords) > 0 {
+		base.PreferenceKeywords = override.PreferenceKeywords
+	}
 	if override.ScheduleCron != "" {
 		base.ScheduleCron = override.ScheduleCron
 	}
@@ -296,6 +308,9 @@ func applyEnv(cfg Config) Config {
 	cfg.EmailFrom = readString("INFOHUB_EMAIL_FROM", cfg.EmailFrom)
 	cfg.EmailTo = readList("INFOHUB_EMAIL_TO", strings.Join(cfg.EmailTo, ","))
 	cfg.EmailSubject = readString("INFOHUB_EMAIL_SUBJECT", cfg.EmailSubject)
+	cfg.PreferenceTags = readList("INFOHUB_PREFERENCE_TAGS", strings.Join(cfg.PreferenceTags, ","))
+	cfg.PreferenceSources = readList("INFOHUB_PREFERENCE_SOURCES", strings.Join(cfg.PreferenceSources, ","))
+	cfg.PreferenceKeywords = readList("INFOHUB_PREFERENCE_KEYWORDS", strings.Join(cfg.PreferenceKeywords, ","))
 	cfg.ScheduleCron = readString("INFOHUB_SCHEDULE_CRON", cfg.ScheduleCron)
 	cfg.ScheduleInterval = readDuration("INFOHUB_SCHEDULE_INTERVAL_SECONDS", cfg.ScheduleInterval)
 	cfg.StorageDir = readString("INFOHUB_STORAGE_DIR", cfg.StorageDir)
@@ -343,6 +358,11 @@ type fileConfig struct {
 		To       []string `json:"to"`
 		Subject  string   `json:"subject"`
 	} `json:"email"`
+	Preference struct {
+		Tags     []string `json:"tags"`
+		Sources  []string `json:"sources"`
+		Keywords []string `json:"keywords"`
+	} `json:"preference"`
 	Storage struct {
 		Dir string `json:"dir"`
 	} `json:"storage"`
@@ -399,6 +419,9 @@ func (f fileConfig) toConfig() Config {
 		EmailFrom:           f.Email.From,
 		EmailTo:             append([]string(nil), f.Email.To...),
 		EmailSubject:        firstNonEmpty(f.Email.Subject, defaultEmailSubject),
+		PreferenceTags:      append([]string(nil), f.Preference.Tags...),
+		PreferenceSources:   append([]string(nil), f.Preference.Sources...),
+		PreferenceKeywords:  append([]string(nil), f.Preference.Keywords...),
 		SendEmptyReport:     f.Webhook.SendEmptyReport,
 		ScheduleCron:        f.Scheduler.Cron,
 		StorageDir:          f.Storage.Dir,

@@ -24,6 +24,9 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("INFOHUB_EMAIL_FROM", "robot@example.com")
 	t.Setenv("INFOHUB_EMAIL_TO", "alice@example.com,bob@example.com")
 	t.Setenv("INFOHUB_EMAIL_SUBJECT", "日报")
+	t.Setenv("INFOHUB_PREFERENCE_TAGS", "AI,Agent")
+	t.Setenv("INFOHUB_PREFERENCE_SOURCES", "openai-news,google-blog")
+	t.Setenv("INFOHUB_PREFERENCE_KEYWORDS", "agent,workflow")
 	t.Setenv("INFOHUB_SCHEDULE_CRON", "*/15 * * * *")
 	t.Setenv("INFOHUB_SCHEDULE_INTERVAL_SECONDS", "120")
 	t.Setenv("INFOHUB_STORAGE_DIR", "tmp/reports")
@@ -63,6 +66,9 @@ func TestLoadFromEnv(t *testing.T) {
 	}
 	if cfg.EmailFrom != "robot@example.com" || len(cfg.EmailTo) != 2 || cfg.EmailTo[1] != "bob@example.com" || cfg.EmailSubject != "日报" {
 		t.Fatalf("unexpected email config: %+v", cfg)
+	}
+	if len(cfg.PreferenceTags) != 2 || cfg.PreferenceTags[0] != "AI" || len(cfg.PreferenceSources) != 2 || len(cfg.PreferenceKeywords) != 2 {
+		t.Fatalf("unexpected preference config: %+v", cfg)
 	}
 	if cfg.ScheduleInterval != 120*time.Second {
 		t.Fatalf("expected 120s schedule interval, got %s", cfg.ScheduleInterval)
@@ -143,6 +149,7 @@ func TestLoadFromJSONFile(t *testing.T) {
   "ai": {"endpoint": "https://api.example.com/v1/chat/completions", "api_key": "file-key", "model": "file-model"},
   "webhook": {"url": "https://example.com/webhook", "send_empty_report": true},
   "email": {"smtp_host": "smtp.example.com", "smtp_port": 2525, "username": "mailer", "password": "secret", "from": "robot@example.com", "to": ["alice@example.com"], "subject": "文件日报"},
+  "preference": {"tags": ["AI"], "sources": ["openai-news"], "keywords": ["agent"]},
   "storage": {"dir": "file/reports"},
   "dedup": {"store_path": "file/dedup/seen.json"},
   "http": {"addr": ":7070"},
@@ -181,6 +188,9 @@ func TestLoadFromJSONFile(t *testing.T) {
 	}
 	if !cfg.UseEmail() || cfg.SMTPPort != 2525 || cfg.EmailSubject != "文件日报" {
 		t.Fatalf("unexpected email config: %+v", cfg)
+	}
+	if len(cfg.PreferenceTags) != 1 || cfg.PreferenceTags[0] != "AI" || len(cfg.PreferenceSources) != 1 || len(cfg.PreferenceKeywords) != 1 {
+		t.Fatalf("unexpected preference config: %+v", cfg)
 	}
 	if cfg.ScheduleInterval != 300*time.Second {
 		t.Fatalf("expected 300s interval, got %s", cfg.ScheduleInterval)

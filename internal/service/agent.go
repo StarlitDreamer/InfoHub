@@ -55,6 +55,7 @@ type ExecutionContext struct {
 	Trigger     string
 	RequestedAt time.Time
 	Sources     []Source
+	Preference  UserPreference
 }
 
 // AgentRequest 表示一次 Agent 任务输入。
@@ -101,7 +102,7 @@ func (a *Agent) RunWithRequest(ctx context.Context, request AgentRequest) (Resul
 		return Result{}, err
 	}
 
-	sortedItems := SortByDecisionScore(items, a.now())
+	sortedItems := SortByPreferenceScore(items, request.Context.Preference, a.now())
 	sortedItems = applySourcePriority(sortedItems, request)
 	displayItems := LimitItems(filterReportItems(sortedItems, request), a.reportMaxItems)
 

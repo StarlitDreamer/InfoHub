@@ -206,6 +206,24 @@ func TestBuildAgentRequestPrefersExplicitSources(t *testing.T) {
 	}
 }
 
+func TestBuildAgentRequestCarriesPreference(t *testing.T) {
+	request := buildAgentRequest(config.Config{
+		PreferenceTags:     []string{"AI"},
+		PreferenceSources:  []string{"openai-news"},
+		PreferenceKeywords: []string{"agent"},
+	}, "manual")
+
+	if len(request.Context.Preference.Tags) != 1 || request.Context.Preference.Tags[0] != "AI" {
+		t.Fatalf("expected preference tags to be carried, got %+v", request.Context.Preference)
+	}
+	if len(request.Context.Preference.Sources) != 1 || request.Context.Preference.Sources[0] != "openai-news" {
+		t.Fatalf("expected preference sources to be carried, got %+v", request.Context.Preference)
+	}
+	if len(request.Context.Preference.Keywords) != 1 || request.Context.Preference.Keywords[0] != "agent" {
+		t.Fatalf("expected preference keywords to be carried, got %+v", request.Context.Preference)
+	}
+}
+
 func TestNewCrawlerFallsBackToDemoWhenSourceBuildFails(t *testing.T) {
 	built := newCrawler(config.Config{
 		Sources: []config.SourceConfig{

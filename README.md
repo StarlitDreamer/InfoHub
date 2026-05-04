@@ -118,6 +118,9 @@ Common environment variables:
 - `INFOHUB_EMAIL_FROM`
 - `INFOHUB_EMAIL_TO`
 - `INFOHUB_EMAIL_SUBJECT`
+- `INFOHUB_PREFERENCE_TAGS`
+- `INFOHUB_PREFERENCE_SOURCES`
+- `INFOHUB_PREFERENCE_KEYWORDS`
 - `INFOHUB_SEND_EMPTY_REPORT`
 - `INFOHUB_STORAGE_DIR`
 - `INFOHUB_DEDUP_STORE_PATH`
@@ -161,6 +164,8 @@ Source config can also use an explicit `sources` array in JSON:
 `http_json` currently accepts either a top-level array or an object with an `items` field. Each item may include `title`, `content`, `source`, `url`, `publish_time`, `tags`, and `score`.
 
 Set `report.group_by_source` to `true` if you want the generated Markdown report to be grouped by item source.
+
+Set personalization preferences if you want decision scoring to favor selected tags, sources, and keywords.
 
 ## HTTP API
 

@@ -26,6 +26,19 @@
     ],
     "subject": "InfoHub 每日报告"
   },
+  "preference": {
+    "tags": [
+      "AI",
+      "Agent"
+    ],
+    "sources": [
+      "openai-news"
+    ],
+    "keywords": [
+      "agent",
+      "workflow"
+    ]
+  },
   "storage": {
     "dir": "data/reports"
   },
