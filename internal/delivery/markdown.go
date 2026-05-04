@@ -3,7 +3,6 @@ package delivery
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"InfoHub-agent/internal/model"
@@ -63,21 +62,9 @@ func renderOverview(builder *strings.Builder, items []model.NewsItem) {
 }
 
 func renderGroupedItems(builder *strings.Builder, items []model.NewsItem) {
-	grouped := make(map[string][]model.NewsItem)
-	order := make([]string, 0)
-
-	for _, item := range items {
-		source := normalizeSource(item.Source)
-		if _, ok := grouped[source]; !ok {
-			order = append(order, source)
-		}
-		grouped[source] = append(grouped[source], item)
-	}
-
-	sort.Strings(order)
-	for _, source := range order {
-		builder.WriteString(fmt.Sprintf("### 来源：%s\n\n", source))
-		for _, item := range grouped[source] {
+	for _, group := range summary.GroupBySource(items) {
+		builder.WriteString(fmt.Sprintf("### 来源：%s\n\n", group.Source))
+		for _, item := range group.Items {
 			renderItem(builder, item)
 		}
 	}

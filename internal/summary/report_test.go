@@ -28,3 +28,22 @@ func TestBuildOverview(t *testing.T) {
 		t.Fatalf("expected priority actions, got %+v", overview.PriorityActions)
 	}
 }
+
+func TestGroupBySource(t *testing.T) {
+	groups := GroupBySource([]model.NewsItem{
+		{Title: "b1", Source: "Beta"},
+		{Title: "a1", Source: "Alpha"},
+		{Title: "a2", Source: "Alpha"},
+		{Title: "u1", Source: ""},
+	})
+
+	if len(groups) != 3 {
+		t.Fatalf("expected 3 groups, got %+v", groups)
+	}
+	if groups[0].Source != "Alpha" || len(groups[0].Items) != 2 {
+		t.Fatalf("unexpected first group: %+v", groups[0])
+	}
+	if groups[2].Source != "未知来源" || len(groups[2].Items) != 1 {
+		t.Fatalf("unexpected unknown source group: %+v", groups[2])
+	}
+}

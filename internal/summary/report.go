@@ -18,6 +18,12 @@ type Overview struct {
 	PriorityActions   []string
 }
 
+// SourceGroup 表示按来源聚合后的日报条目分组。
+type SourceGroup struct {
+	Source string
+	Items  []model.NewsItem
+}
+
 // BuildOverview 构建日报概览。
 func BuildOverview(items []model.NewsItem, titleLimit, actionLimit int) Overview {
 	return Overview{
@@ -27,6 +33,31 @@ func BuildOverview(items []model.NewsItem, titleLimit, actionLimit int) Overview
 		TopTitles:         topTitles(items, titleLimit),
 		PriorityActions:   summarizePriorityActions(items, actionLimit),
 	}
+}
+
+// GroupBySource 将条目按来源分组，并按来源名称排序。
+func GroupBySource(items []model.NewsItem) []SourceGroup {
+	grouped := make(map[string][]model.NewsItem)
+	order := make([]string, 0)
+
+	for _, item := range items {
+		source := normalizeSource(item.Source)
+		if _, ok := grouped[source]; !ok {
+			order = append(order, source)
+		}
+		grouped[source] = append(grouped[source], item)
+	}
+
+	sort.Strings(order)
+	result := make([]SourceGroup, 0, len(order))
+	for _, source := range order {
+		result = append(result, SourceGroup{
+			Source: source,
+			Items:  grouped[source],
+		})
+	}
+
+	return result
 }
 
 func summarizePriorityActions(items []model.NewsItem, limit int) []string {
