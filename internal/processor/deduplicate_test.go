@@ -165,3 +165,27 @@ func TestDeduplicateItemsDoesNotMergeUnrelatedItems(t *testing.T) {
 		t.Fatalf("expected unrelated items to stay separate, got %d", len(result))
 	}
 }
+
+func TestDeduplicateItemsMergesTitlesWithSourceSuffixes(t *testing.T) {
+	baseTime := time.Date(2026, 5, 4, 10, 0, 0, 0, time.UTC)
+	items := []model.NewsItem{
+		{
+			ID:          1,
+			Title:       "OpenAI releases GPT-5 enterprise coding model - OpenAI News",
+			Content:     "OpenAI released GPT-5 for enterprise teams with stronger coding and analysis workflows.",
+			PublishTime: baseTime,
+		},
+		{
+			ID:          2,
+			Title:       "OpenAI releases GPT-5 enterprise coding model",
+			Content:     "OpenAI released GPT-5 for enterprise teams with stronger coding and analysis workflows.",
+			PublishTime: baseTime.Add(90 * time.Minute),
+		},
+	}
+
+	result := DeduplicateItems(items)
+
+	if len(result) != 1 {
+		t.Fatalf("expected source suffix variants to merge, got %d items", len(result))
+	}
+}

@@ -78,7 +78,7 @@ func (c *HTTPClient) Analyze(item model.NewsItem) (Analysis, error) {
 		return Analysis{}, errors.New("ai response has no choices")
 	}
 
-	return parseAnalysis(result.Choices[0].Message.Content)
+	return parseAnalysis(result.Choices[0].Message.Content, item)
 }
 
 // Classify 返回标签。
@@ -121,17 +121,47 @@ func promptFor(item model.NewsItem) string {
 	)
 }
 
-func parseAnalysis(content string) (Analysis, error) {
+func parseAnalysis(content string, item model.NewsItem) (Analysis, error) {
 	var payload analysisPayload
 	if err := json.Unmarshal([]byte(strings.TrimSpace(content)), &payload); err != nil {
 		return Analysis{}, err
 	}
 
+	score := clampScore(payload.Score)
 	return Analysis{
 		Tags:    normalizeTags(payload.Tags),
-		Summary: strings.TrimSpace(payload.Summary),
-		Score:   clampScore(payload.Score),
+		Summary: normalizeSummary(payload.Summary, item, score),
+		Score:   score,
 	}, nil
+}
+
+func normalizeSummary(summary string, item model.NewsItem, score float64) string {
+	summary = strings.TrimSpace(summary)
+	if hasRequiredSummaryLabels(summary) {
+		return summary
+	}
+
+	content := strings.TrimSpace(item.Content)
+	if content == "" {
+		content = item.Title
+	}
+
+	return fmt.Sprintf(
+		"【标题】%s\n【发生了什么】%s\n【为什么重要】该信息可能影响后续技术选型或行动判断。\n【影响】建议持续关注相关进展。\n【评分】%.0f",
+		item.Title,
+		content,
+		score,
+	)
+}
+
+func hasRequiredSummaryLabels(summary string) bool {
+	for _, label := range []string{"【标题】", "【发生了什么】", "【为什么重要】", "【影响】", "【评分】"} {
+		if !strings.Contains(summary, label) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func normalizeTags(tags []string) []string {

@@ -51,9 +51,7 @@ func IsSimilarEvent(left, right model.NewsItem) bool {
 		return false
 	}
 
-	titleShingleSimilarity := shingleSimilarity(left.Title, right.Title)
-	titleTokenSimilarity := tokenSimilarity(left.Title, right.Title)
-	titleSimilarity := maxFloat(titleShingleSimilarity, titleTokenSimilarity)
+	titleSimilarity := titleSimilarityScore(left.Title, right.Title)
 	if titleSimilarity < 0.55 {
 		return false
 	}
@@ -67,6 +65,23 @@ func IsSimilarEvent(left, right model.NewsItem) bool {
 	contentSimilarity := maxFloat(contentShingleSimilarity, contentTokenSimilarity)
 
 	return titleSimilarity >= 0.58 && contentSimilarity >= 0.5
+}
+
+func titleSimilarityScore(left, right string) float64 {
+	leftVariants := titleVariants(left)
+	rightVariants := titleVariants(right)
+	best := 0.0
+
+	for _, leftValue := range leftVariants {
+		for _, rightValue := range rightVariants {
+			score := maxFloat(shingleSimilarity(leftValue, rightValue), tokenSimilarity(leftValue, rightValue))
+			if score > best {
+				best = score
+			}
+		}
+	}
+
+	return best
 }
 
 func hasAnyDedupKey(seen map[string]struct{}, keys []string) bool {
@@ -277,6 +292,39 @@ func normalizeSimilarityText(value string) string {
 	}
 
 	return strings.TrimSpace(builder.String())
+}
+
+func titleVariants(value string) []string {
+	candidates := []string{value}
+	for _, separator := range []string{" - ", " | ", " -- ", " — ", ": "} {
+		parts := strings.Split(value, separator)
+		if len(parts) != 2 {
+			continue
+		}
+		for _, part := range parts {
+			part = strings.TrimSpace(part)
+			if part == "" || len([]rune(part)) < 8 {
+				continue
+			}
+			candidates = append(candidates, part)
+		}
+	}
+
+	result := make([]string, 0, len(candidates))
+	seen := make(map[string]struct{}, len(candidates))
+	for _, candidate := range candidates {
+		normalized := strings.TrimSpace(candidate)
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		result = append(result, normalized)
+	}
+
+	return result
 }
 
 func maxFloat(left, right float64) float64 {

@@ -14,6 +14,8 @@ var (
 	urlPattern           = regexp.MustCompile(`https?://\S+`)
 	spacePattern         = regexp.MustCompile(`[^\S\r\n]+`)
 	multiNewlinePattern  = regexp.MustCompile(`\n+`)
+	dropMetaLinePattern  = regexp.MustCompile(`(?i)^(share( this article)?|sharing|print|posted by|author|source|tags?|filed under|leave a comment)\b`)
+	shareMetaPattern     = regexp.MustCompile(`(?i)^(share|sharing|print|posted by|author|source|tags?|filed under)[:\s-]+`)
 	noisyBlockPatterns   = []*regexp.Regexp{
 		regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`),
 		regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`),
@@ -53,6 +55,10 @@ func normalizeCleanLines(value string) string {
 	for _, rawLine := range rawLines {
 		line := strings.TrimSpace(spacePattern.ReplaceAllString(rawLine, " "))
 		line = strings.Trim(line, "-|:")
+		if dropMetaLinePattern.MatchString(line) {
+			continue
+		}
+		line = strings.TrimSpace(shareMetaPattern.ReplaceAllString(line, ""))
 		if line == "" || isBoilerplateLine(line) {
 			continue
 		}
@@ -78,6 +84,12 @@ func isBoilerplateLine(line string) bool {
 		"read more",
 		"continue reading",
 		"click here",
+		"this article",
+		"share this",
+		"share on",
+		"posted by",
+		"filed under",
+		"leave a comment",
 		"subscribe",
 		"all rights reserved",
 		"copyright",
@@ -93,6 +105,11 @@ func isBoilerplateLine(line string) bool {
 		if strings.Contains(lower, marker) {
 			return true
 		}
+	}
+
+	switch lower {
+	case "share", "print", "more", "tags", "author", "source", "this article", "阅读全文":
+		return true
 	}
 
 	return false
