@@ -5,11 +5,11 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 
+	"InfoHub-agent/internal/model"
 	"InfoHub-agent/internal/repository"
 	"InfoHub-agent/internal/service"
 )
@@ -47,7 +47,14 @@ type Options struct {
 	UserPreferenceRepo repository.UserPreferenceRepository
 }
 
-var markdownSectionPattern = regexp.MustCompile(`(?m)^## `)
+type reportDecisionSummary struct {
+	Title   string   `json:"title"`
+	Source  string   `json:"source"`
+	Score   float64  `json:"score"`
+	Tags    []string `json:"tags"`
+	Action  string   `json:"action"`
+	Summary string   `json:"summary"`
+}
 
 // NewRouter 创建 HTTP 路由。
 func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Options) *gin.Engine {
@@ -154,10 +161,12 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Op
 		}
 
 		ctx.JSON(http.StatusOK, gin.H{
-			"generated_at":  record.GeneratedAt,
-			"markdown":      record.Markdown,
-			"items":         record.Items,
-			"display_count": len(markdownSectionPattern.FindAllStringIndex(record.Markdown, -1)),
+			"generated_at":       record.GeneratedAt,
+			"markdown":           record.Markdown,
+			"items":              record.Items,
+			"display_count":      repository.CountDisplayItems(record.Markdown),
+			"decision_summary":   buildDecisionSummary(record.Items, 3),
+			"top_priority_items": buildTopPriorityTitles(record.Items, 3),
 		})
 	})
 
@@ -204,4 +213,100 @@ func (r PreferenceRequest) ToUserPreference() service.UserPreference {
 			KeywordMatch: r.Weights.Keyword,
 		},
 	}
+}
+
+func buildDecisionSummary(items []model.NewsItem, limit int) []reportDecisionSummary {
+	if limit <= 0 {
+		limit = 1
+	}
+	if len(items) > limit {
+		items = items[:limit]
+	}
+
+	result := make([]reportDecisionSummary, 0, len(items))
+	for _, item := range items {
+		result = append(result, reportDecisionSummary{
+			Title:   strings.TrimSpace(item.Title),
+			Source:  normalizeSource(item),
+			Score:   item.Score,
+			Tags:    append([]string(nil), item.Tags...),
+			Action:  summarizeAction(item),
+			Summary: summarizeWhatHappened(item),
+		})
+	}
+
+	return result
+}
+
+func buildTopPriorityTitles(items []model.NewsItem, limit int) []string {
+	if limit <= 0 {
+		limit = 1
+	}
+	if len(items) > limit {
+		items = items[:limit]
+	}
+
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		title := strings.TrimSpace(item.Title)
+		if title == "" {
+			continue
+		}
+		result = append(result, title)
+	}
+
+	return result
+}
+
+func summarizeAction(item model.NewsItem) string {
+	score := item.Score
+	text := strings.ToLower(strings.Join(item.Tags, " ") + " " + item.Title + " " + item.Content)
+
+	switch {
+	case score >= 5:
+		return "立即评审"
+	case score >= 4:
+		return "近期跟进"
+	case strings.Contains(text, "security") || strings.Contains(text, "安全") || strings.Contains(text, "cyber"):
+		return "安全评估"
+	case strings.Contains(text, "database") || strings.Contains(text, "数据库") || strings.Contains(text, "index"):
+		return "专项验证"
+	case strings.Contains(text, "ai") || strings.Contains(text, "agent") || strings.Contains(text, "模型"):
+		return "小范围试用"
+	default:
+		return "持续观察"
+	}
+}
+
+func summarizeWhatHappened(item model.NewsItem) string {
+	for _, rawLine := range strings.Split(item.Content, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if strings.HasPrefix(line, "【发生了什么】") {
+			value := strings.TrimSpace(strings.TrimPrefix(line, "【发生了什么】"))
+			if value != "" {
+				return value
+			}
+		}
+	}
+
+	content := strings.TrimSpace(item.Content)
+	if content == "" {
+		return strings.TrimSpace(item.Title)
+	}
+
+	lines := strings.Split(content, "\n")
+	return strings.TrimSpace(lines[0])
+}
+
+func normalizeSource(item model.NewsItem) string {
+	source := strings.TrimSpace(item.Source)
+	if source != "" {
+		return source
+	}
+	sourceName := strings.TrimSpace(item.SourceName)
+	if sourceName != "" {
+		return sourceName
+	}
+
+	return "未知来源"
 }

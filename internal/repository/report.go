@@ -60,12 +60,36 @@ type ReportMetadata struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
-func countDisplayItems(markdown string) int {
+// CountDisplayItems 统计日报中实际展示的信息条目数量。
+func CountDisplayItems(markdown string) int {
 	count := 0
 	for _, line := range strings.Split(markdown, "\n") {
-		if strings.HasPrefix(line, "## ") {
-			count++
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "## ") {
+			continue
 		}
+		if line == "## 今日概览" {
+			continue
+		}
+		if strings.HasPrefix(line, "### ") {
+			continue
+		}
+		if line == "## Overview" {
+			continue
+		}
+		if line == "## Summary" {
+			continue
+		}
+		if line == "## Today's Overview" {
+			continue
+		}
+		if line == "## Today Overview" {
+			continue
+		}
+		if line == "## Highlights" {
+			continue
+		}
+		count++
 	}
 
 	return count

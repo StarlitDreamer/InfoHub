@@ -125,7 +125,7 @@ func (r *FileReportRepository) List(ctx context.Context) ([]ReportMetadata, erro
 			Markdown:     filepath.ToSlash(filepath.Join("reports", entry.Name())),
 			Items:        filepath.ToSlash(filepath.Join("items", name+".json")),
 			ItemCount:    len(items),
-			DisplayCount: countDisplayItems(string(markdownContent)),
+			DisplayCount: CountDisplayItems(string(markdownContent)),
 			CreatedAt:    createdAt,
 		})
 	}

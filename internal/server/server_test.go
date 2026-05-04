@@ -118,8 +118,12 @@ func TestLatestReport(t *testing.T) {
 	repo := newMemoryRepository()
 	_ = repo.Save(context.Background(), repository.ReportRecord{
 		GeneratedAt: time.Date(2026, 5, 3, 16, 0, 0, 0, time.UTC),
-		Markdown:    "# 今日信息\n\n## ⭐⭐⭐\n- 标题：测试一\n- 摘要：摘要一\n\n## ⭐⭐\n- 标题：测试二\n- 摘要：摘要二\n",
-		Items:       []model.NewsItem{{Title: "测试"}},
+		Markdown: "# 今日信息日报\n\n## 今日概览\n- 收录条目：2\n\n## ⭐⭐ 测试一\n- 标题：测试一\n" +
+			"\n## ⭐ 测试二\n- 标题：测试二\n",
+		Items: []model.NewsItem{
+			{Title: "测试一", Source: "OpenAI News", Score: 4, Tags: []string{"AI"}, Content: "【发生了什么】summary one"},
+			{Title: "测试二", Source: "Google Blog", Score: 2, Content: "plain summary two"},
+		},
 	})
 	router := NewRouter(repo, func(context.Context, RunReportRequest) (ReportResult, error) {
 		return ReportResult{}, nil
@@ -133,8 +137,15 @@ func TestLatestReport(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", recorder.Code)
 	}
 
-	if !strings.Contains(recorder.Body.String(), `"display_count":2`) {
-		t.Fatalf("expected latest report response to include display_count, got %s", recorder.Body.String())
+	body := recorder.Body.String()
+	if !strings.Contains(body, `"display_count":2`) {
+		t.Fatalf("expected latest report response to include display_count, got %s", body)
+	}
+	if !strings.Contains(body, `"decision_summary"`) || !strings.Contains(body, `"top_priority_items"`) {
+		t.Fatalf("expected latest report response to include summary fields, got %s", body)
+	}
+	if !strings.Contains(body, `"action":"近期跟进"`) || !strings.Contains(body, `"summary":"summary one"`) {
+		t.Fatalf("expected latest report response to include decision summary details, got %s", body)
 	}
 }
 
@@ -215,7 +226,7 @@ func TestReportsListIncludesSummaryCounts(t *testing.T) {
 	repo.records = []repository.ReportRecord{
 		{
 			GeneratedAt: time.Date(2026, 5, 3, 16, 0, 0, 0, time.UTC),
-			Markdown:    "# 今日信息\n\n## ⭐⭐⭐\n- 标题：测试一\n- 摘要：摘要一\n",
+			Markdown:    "# 今日信息日报\n\n## 今日概览\n- 收录条目：2\n\n## ⭐⭐⭐ 测试一\n- 标题：测试一\n",
 			Items:       []model.NewsItem{{Title: "测试一"}, {Title: "库存条目"}},
 		},
 	}
@@ -241,7 +252,7 @@ func TestReportsListKeepsItemCountAndDisplayCountIndependent(t *testing.T) {
 	repo.records = []repository.ReportRecord{
 		{
 			GeneratedAt: time.Date(2026, 5, 3, 16, 0, 0, 0, time.UTC),
-			Markdown:    "# report\n\n## item one\nbody\n\n## item two\nbody\n",
+			Markdown:    "# report\n\n## 今日概览\nbody\n\n## ⭐ item one\nbody\n\n## ⭐ item two\nbody\n",
 			Items: []model.NewsItem{
 				{Title: "one"},
 				{Title: "two"},
@@ -347,17 +358,10 @@ func (r *memoryRepository) Latest(ctx context.Context) (repository.ReportRecord,
 func (r *memoryRepository) List(ctx context.Context) ([]repository.ReportMetadata, error) {
 	result := make([]repository.ReportMetadata, 0, len(r.records))
 	for _, record := range r.records {
-		displayCount := 0
-		for _, line := range strings.Split(record.Markdown, "\n") {
-			if strings.HasPrefix(line, "## ") {
-				displayCount++
-			}
-		}
-
 		result = append(result, repository.ReportMetadata{
 			Name:         record.GeneratedAt.Format("20060102-150405"),
 			ItemCount:    len(record.Items),
-			DisplayCount: displayCount,
+			DisplayCount: repository.CountDisplayItems(record.Markdown),
 			CreatedAt:    record.GeneratedAt,
 		})
 	}
