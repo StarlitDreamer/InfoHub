@@ -188,12 +188,22 @@ Optional request body:
 
 ```json
 {
+  "user_id": "alice",
   "preference": {
     "tags": ["AI", "Agent"],
     "sources": ["openai-news"],
     "keywords": ["workflow"]
   }
 }
+```
+
+When `user_id` is provided, the server will load that user's stored preference first, then apply any request-specific preference overrides from the body.
+
+Manage stored user preferences:
+
+```http
+PUT /preferences/:userID
+GET /preferences/:userID
 ```
 
 Example response:

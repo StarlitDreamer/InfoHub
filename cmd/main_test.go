@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -303,6 +304,48 @@ func TestMergePreferenceOverridesConfiguredValuesWhenRequestProvided(t *testing.
 	}
 }
 
+func TestResolveUserPreferenceReturnsStoredRecord(t *testing.T) {
+	repo := &preferenceRepoStub{
+		record: repository.UserPreferenceRecord{
+			UserID:   "alice",
+			Tags:     []string{"AI"},
+			Sources:  []string{"openai-news"},
+			Keywords: []string{"agent"},
+			Weights: repository.PreferenceWeightValue{
+				Tag:     1.7,
+				Source:  1.2,
+				Keyword: 0.9,
+			},
+		},
+	}
+
+	preference, err := resolveUserPreference(context.Background(), repo, "alice")
+	if err != nil {
+		t.Fatalf("expected stored preference, got %v", err)
+	}
+	if len(preference.Tags) != 1 || preference.Weights.TagMatch != 1.7 {
+		t.Fatalf("unexpected resolved preference: %+v", preference)
+	}
+}
+
+func TestResolveUserPreferenceIgnoresMissingUser(t *testing.T) {
+	preference, err := resolveUserPreference(context.Background(), &preferenceRepoStub{err: repository.ErrUserPreferenceNotFound}, "missing")
+	if err != nil {
+		t.Fatalf("expected missing user to be ignored, got %v", err)
+	}
+	if !preference.IsZero() {
+		t.Fatalf("expected empty preference, got %+v", preference)
+	}
+}
+
+func TestResolveUserPreferenceReturnsUnexpectedError(t *testing.T) {
+	expectedErr := errors.New("boom")
+	_, err := resolveUserPreference(context.Background(), &preferenceRepoStub{err: expectedErr}, "alice")
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("expected %v, got %v", expectedErr, err)
+	}
+}
+
 type captureReportRepository struct {
 	saveCalls int
 	record    repository.ReportRecord
@@ -320,4 +363,21 @@ func (r *captureReportRepository) Latest(ctx context.Context) (repository.Report
 
 func (r *captureReportRepository) List(ctx context.Context) ([]repository.ReportMetadata, error) {
 	return nil, nil
+}
+
+type preferenceRepoStub struct {
+	record repository.UserPreferenceRecord
+	err    error
+}
+
+func (r *preferenceRepoStub) Save(ctx context.Context, record repository.UserPreferenceRecord) error {
+	r.record = record
+	return r.err
+}
+
+func (r *preferenceRepoStub) Get(ctx context.Context, userID string) (repository.UserPreferenceRecord, error) {
+	if r.err != nil {
+		return repository.UserPreferenceRecord{}, r.err
+	}
+	return r.record, nil
 }

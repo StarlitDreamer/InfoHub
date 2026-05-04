@@ -73,6 +73,30 @@ func TestRunReportPassesPreferenceRequest(t *testing.T) {
 	if len(captured.Preference.Tags) != 1 || captured.Preference.Tags[0] != "AI" {
 		t.Fatalf("expected preference tags to be parsed, got %+v", captured)
 	}
+	if captured.UserID != "" {
+		t.Fatalf("expected empty user id by default, got %+v", captured)
+	}
+}
+
+func TestRunReportPassesUserID(t *testing.T) {
+	var captured RunReportRequest
+	router := NewRouter(newMemoryRepository(), func(_ context.Context, request RunReportRequest) (ReportResult, error) {
+		captured = request
+		return ReportResult{ItemCount: 1, DisplayCount: 1}, nil
+	}, Options{})
+	body := bytes.NewBufferString(`{"user_id":"alice"}`)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/reports/run", body)
+	request.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+	if captured.UserID != "alice" {
+		t.Fatalf("expected user id alice, got %+v", captured)
+	}
 }
 
 func TestRunReportRejectsInvalidBody(t *testing.T) {
@@ -257,6 +281,48 @@ func TestHealthSkipsAuth(t *testing.T) {
 	}
 }
 
+func TestPreferenceEndpointsSaveAndRead(t *testing.T) {
+	preferenceRepo := newMemoryPreferenceRepository()
+	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
+		return ReportResult{}, nil
+	}, Options{UserPreferenceRepo: preferenceRepo})
+
+	putBody := bytes.NewBufferString(`{"tags":["AI"],"sources":["openai-news"],"keywords":["agent"],"weights":{"tag":1.5,"source":1.2,"keyword":0.8}}`)
+	putRecorder := httptest.NewRecorder()
+	putRequest := httptest.NewRequest(http.MethodPut, "/preferences/alice", putBody)
+	putRequest.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(putRecorder, putRequest)
+
+	if putRecorder.Code != http.StatusOK {
+		t.Fatalf("expected put status 200, got %d", putRecorder.Code)
+	}
+
+	getRecorder := httptest.NewRecorder()
+	getRequest := httptest.NewRequest(http.MethodGet, "/preferences/alice", nil)
+	router.ServeHTTP(getRecorder, getRequest)
+
+	if getRecorder.Code != http.StatusOK {
+		t.Fatalf("expected get status 200, got %d", getRecorder.Code)
+	}
+	body := getRecorder.Body.String()
+	if !strings.Contains(body, `"user_id":"alice"`) || !strings.Contains(body, `"tag":1.5`) {
+		t.Fatalf("expected stored preference in response, got %s", body)
+	}
+}
+
+func TestPreferenceGetReturnsNotFound(t *testing.T) {
+	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
+		return ReportResult{}, nil
+	}, Options{UserPreferenceRepo: newMemoryPreferenceRepository()})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/preferences/missing", nil)
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", recorder.Code)
+	}
+}
+
 type memoryRepository struct {
 	records []repository.ReportRecord
 }
@@ -297,4 +363,26 @@ func (r *memoryRepository) List(ctx context.Context) ([]repository.ReportMetadat
 	}
 
 	return result, nil
+}
+
+type memoryPreferenceRepository struct {
+	records map[string]repository.UserPreferenceRecord
+}
+
+func newMemoryPreferenceRepository() *memoryPreferenceRepository {
+	return &memoryPreferenceRepository{records: map[string]repository.UserPreferenceRecord{}}
+}
+
+func (r *memoryPreferenceRepository) Save(ctx context.Context, record repository.UserPreferenceRecord) error {
+	r.records[record.UserID] = record
+	return nil
+}
+
+func (r *memoryPreferenceRepository) Get(ctx context.Context, userID string) (repository.UserPreferenceRecord, error) {
+	record, ok := r.records[userID]
+	if !ok {
+		return repository.UserPreferenceRecord{}, repository.ErrUserPreferenceNotFound
+	}
+
+	return record, nil
 }

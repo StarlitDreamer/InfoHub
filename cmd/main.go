@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -125,11 +126,22 @@ func runServer(cfg config.Config) error {
 	}
 	defer closeRepo()
 
+	preferenceRepo := newUserPreferenceRepository(cfg)
 	router := server.NewRouter(repo, func(ctx context.Context, request server.RunReportRequest) (server.ReportResult, error) {
 		agentRequest := buildAgentRequest(cfg, "http")
+		if request.UserID != "" {
+			preference, err := resolveUserPreference(ctx, preferenceRepo, request.UserID)
+			if err != nil {
+				return server.ReportResult{}, err
+			}
+			agentRequest.Context.Preference = mergePreference(agentRequest.Context.Preference, preference)
+		}
 		agentRequest.Context.Preference = mergePreference(agentRequest.Context.Preference, request.Preference.ToUserPreference())
 		return runReportWithRepository(ctx, cfg, repo, agentRequest)
-	}, server.Options{AuthToken: cfg.AuthToken})
+	}, server.Options{
+		AuthToken:          cfg.AuthToken,
+		UserPreferenceRepo: preferenceRepo,
+	})
 
 	return router.Run(cfg.HTTPAddr)
 }
@@ -260,4 +272,33 @@ func buildSenders(cfg config.Config) []service.MarkdownSender {
 	}
 
 	return senders
+}
+
+func newUserPreferenceRepository(cfg config.Config) repository.UserPreferenceRepository {
+	return repository.NewFileUserPreferenceRepository(filepath.Join(cfg.StorageDir, "preferences", "users.json"))
+}
+
+func resolveUserPreference(ctx context.Context, repo repository.UserPreferenceRepository, userID string) (service.UserPreference, error) {
+	if repo == nil || userID == "" {
+		return service.UserPreference{}, nil
+	}
+
+	stored, err := repo.Get(ctx, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserPreferenceNotFound) {
+			return service.UserPreference{}, nil
+		}
+		return service.UserPreference{}, err
+	}
+
+	return service.UserPreference{
+		Tags:     append([]string(nil), stored.Tags...),
+		Sources:  append([]string(nil), stored.Sources...),
+		Keywords: append([]string(nil), stored.Keywords...),
+		Weights: service.PreferenceWeights{
+			TagMatch:     stored.Weights.Tag,
+			SourceMatch:  stored.Weights.Source,
+			KeywordMatch: stored.Weights.Keyword,
+		},
+	}, nil
 }
