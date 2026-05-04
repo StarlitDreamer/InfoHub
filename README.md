@@ -181,6 +181,18 @@ Run report generation:
 POST /reports/run
 ```
 
+Optional request body:
+
+```json
+{
+  "preference": {
+    "tags": ["AI", "Agent"],
+    "sources": ["openai-news"],
+    "keywords": ["workflow"]
+  }
+}
+```
+
 Example response:
 
 ```json

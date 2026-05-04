@@ -61,10 +61,10 @@ func runReport(ctx context.Context, cfg config.Config, trigger string) (server.R
 	}
 	defer closeRepo()
 
-	return runReportWithRepository(ctx, cfg, repo, trigger)
+	return runReportWithRepository(ctx, cfg, repo, buildAgentRequest(cfg, trigger))
 }
 
-func runReportWithRepository(ctx context.Context, cfg config.Config, repo repository.ReportRepository, trigger string) (server.ReportResult, error) {
+func runReportWithRepository(ctx context.Context, cfg config.Config, repo repository.ReportRepository, request service.AgentRequest) (server.ReportResult, error) {
 	pipeline := service.NewPipeline(
 		newCrawler(cfg),
 		newAIProcessor(cfg),
@@ -78,7 +78,7 @@ func runReportWithRepository(ctx context.Context, cfg config.Config, repo reposi
 	}
 
 	agent := service.NewAgent(pipeline, repo, options)
-	result, err := agent.RunWithRequest(ctx, buildAgentRequest(cfg, trigger))
+	result, err := agent.RunWithRequest(ctx, request)
 	if err != nil {
 		return server.ReportResult{}, err
 	}
@@ -125,8 +125,10 @@ func runServer(cfg config.Config) error {
 	}
 	defer closeRepo()
 
-	router := server.NewRouter(repo, func(ctx context.Context) (server.ReportResult, error) {
-		return runReportWithRepository(ctx, cfg, repo, "http")
+	router := server.NewRouter(repo, func(ctx context.Context, request server.RunReportRequest) (server.ReportResult, error) {
+		agentRequest := buildAgentRequest(cfg, "http")
+		agentRequest.Context.Preference = mergePreference(agentRequest.Context.Preference, request.Preference.ToUserPreference())
+		return runReportWithRepository(ctx, cfg, repo, agentRequest)
 	}, server.Options{AuthToken: cfg.AuthToken})
 
 	return router.Run(cfg.HTTPAddr)
@@ -181,6 +183,21 @@ func buildAgentRequest(cfg config.Config, trigger string) service.AgentRequest {
 			},
 		},
 	}
+}
+
+func mergePreference(base, override service.UserPreference) service.UserPreference {
+	merged := base
+	if len(override.Tags) > 0 {
+		merged.Tags = append([]string(nil), override.Tags...)
+	}
+	if len(override.Sources) > 0 {
+		merged.Sources = append([]string(nil), override.Sources...)
+	}
+	if len(override.Keywords) > 0 {
+		merged.Keywords = append([]string(nil), override.Keywords...)
+	}
+
+	return merged
 }
 
 func newDedupStore(cfg config.Config) processor.DedupStore {

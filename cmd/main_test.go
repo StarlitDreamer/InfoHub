@@ -9,6 +9,7 @@ import (
 	"InfoHub-agent/internal/config"
 	"InfoHub-agent/internal/crawler"
 	"InfoHub-agent/internal/repository"
+	"InfoHub-agent/internal/service"
 )
 
 func TestRunRejectsUnknownMode(t *testing.T) {
@@ -76,7 +77,7 @@ func TestRunReportWithRepositorySavesSortedItemsAndTrimmedMarkdown(t *testing.T)
 	}
 	repo := &captureReportRepository{}
 
-	result, err := runReportWithRepository(context.Background(), cfg, repo, "manual")
+	result, err := runReportWithRepository(context.Background(), cfg, repo, buildAgentRequest(cfg, "manual"))
 	if err != nil {
 		t.Fatalf("runReportWithRepository failed: %v", err)
 	}
@@ -131,12 +132,12 @@ func TestRunReportWithRepositoryStoresEmptyReportWhenNoNewItems(t *testing.T) {
 	}
 
 	firstRepo := &captureReportRepository{}
-	if _, err := runReportWithRepository(context.Background(), cfg, firstRepo, "manual"); err != nil {
+	if _, err := runReportWithRepository(context.Background(), cfg, firstRepo, buildAgentRequest(cfg, "manual")); err != nil {
 		t.Fatalf("first runReportWithRepository failed: %v", err)
 	}
 
 	secondRepo := &captureReportRepository{}
-	result, err := runReportWithRepository(context.Background(), cfg, secondRepo, "manual")
+	result, err := runReportWithRepository(context.Background(), cfg, secondRepo, buildAgentRequest(cfg, "manual"))
 	if err != nil {
 		t.Fatalf("second runReportWithRepository failed: %v", err)
 	}
@@ -263,6 +264,30 @@ func TestBuildSchedulerRejectsInvalidCron(t *testing.T) {
 	}, func(context.Context) error { return nil })
 	if err == nil {
 		t.Fatal("expected invalid cron to fail")
+	}
+}
+
+func TestMergePreferenceOverridesConfiguredValuesWhenRequestProvided(t *testing.T) {
+	merged := mergePreference(
+		service.UserPreference{
+			Tags:     []string{"AI"},
+			Sources:  []string{"config-source"},
+			Keywords: []string{"workflow"},
+		},
+		service.UserPreference{
+			Tags:    []string{"数据库"},
+			Sources: []string{"request-source"},
+		},
+	)
+
+	if len(merged.Tags) != 1 || merged.Tags[0] != "数据库" {
+		t.Fatalf("expected request tags to override config, got %+v", merged)
+	}
+	if len(merged.Sources) != 1 || merged.Sources[0] != "request-source" {
+		t.Fatalf("expected request sources to override config, got %+v", merged)
+	}
+	if len(merged.Keywords) != 1 || merged.Keywords[0] != "workflow" {
+		t.Fatalf("expected missing request keywords to keep config value, got %+v", merged)
 	}
 }
 

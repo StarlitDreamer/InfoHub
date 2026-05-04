@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/http"
@@ -14,7 +15,7 @@ import (
 )
 
 func TestHealth(t *testing.T) {
-	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
+	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
 		return ReportResult{}, nil
 	}, Options{})
 	recorder := httptest.NewRecorder()
@@ -29,7 +30,7 @@ func TestHealth(t *testing.T) {
 
 func TestRunReport(t *testing.T) {
 	called := false
-	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
+	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
 		called = true
 		return ReportResult{ItemCount: 26, DisplayCount: 12}, nil
 	}, Options{})
@@ -53,6 +54,42 @@ func TestRunReport(t *testing.T) {
 	}
 }
 
+func TestRunReportPassesPreferenceRequest(t *testing.T) {
+	var captured RunReportRequest
+	router := NewRouter(newMemoryRepository(), func(_ context.Context, request RunReportRequest) (ReportResult, error) {
+		captured = request
+		return ReportResult{ItemCount: 1, DisplayCount: 1}, nil
+	}, Options{})
+	body := bytes.NewBufferString(`{"preference":{"tags":["AI"],"sources":["openai-news"],"keywords":["agent"]}}`)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/reports/run", body)
+	request.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+	if len(captured.Preference.Tags) != 1 || captured.Preference.Tags[0] != "AI" {
+		t.Fatalf("expected preference tags to be parsed, got %+v", captured)
+	}
+}
+
+func TestRunReportRejectsInvalidBody(t *testing.T) {
+	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
+		return ReportResult{}, nil
+	}, Options{})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/reports/run", bytes.NewBufferString(`{"preference":`))
+	request.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", recorder.Code)
+	}
+}
+
 func TestLatestReport(t *testing.T) {
 	repo := newMemoryRepository()
 	_ = repo.Save(context.Background(), repository.ReportRecord{
@@ -60,7 +97,7 @@ func TestLatestReport(t *testing.T) {
 		Markdown:    "# 今日信息\n\n## ⭐⭐⭐\n- 标题：测试一\n- 摘要：摘要一\n\n## ⭐⭐\n- 标题：测试二\n- 摘要：摘要二\n",
 		Items:       []model.NewsItem{{Title: "测试"}},
 	})
-	router := NewRouter(repo, func(context.Context) (ReportResult, error) {
+	router := NewRouter(repo, func(context.Context, RunReportRequest) (ReportResult, error) {
 		return ReportResult{}, nil
 	}, Options{})
 	recorder := httptest.NewRecorder()
@@ -78,7 +115,7 @@ func TestLatestReport(t *testing.T) {
 }
 
 func TestLatestReportReturnsNotFoundWhenRepositoryIsEmpty(t *testing.T) {
-	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
+	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
 		return ReportResult{}, nil
 	}, Options{})
 	recorder := httptest.NewRecorder()
@@ -92,7 +129,7 @@ func TestLatestReportReturnsNotFoundWhenRepositoryIsEmpty(t *testing.T) {
 }
 
 func TestRunReportReturnsErrorWhenRunnerFails(t *testing.T) {
-	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
+	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
 		return ReportResult{}, errors.New("boom")
 	}, Options{})
 	recorder := httptest.NewRecorder()
@@ -106,7 +143,7 @@ func TestRunReportReturnsErrorWhenRunnerFails(t *testing.T) {
 }
 
 func TestAuthRequiredWhenTokenConfigured(t *testing.T) {
-	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
+	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
 		return ReportResult{}, nil
 	}, Options{AuthToken: "secret"})
 	recorder := httptest.NewRecorder()
@@ -120,7 +157,7 @@ func TestAuthRequiredWhenTokenConfigured(t *testing.T) {
 }
 
 func TestAuthRejectsWrongToken(t *testing.T) {
-	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
+	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
 		return ReportResult{}, nil
 	}, Options{AuthToken: "secret"})
 	recorder := httptest.NewRecorder()
@@ -135,7 +172,7 @@ func TestAuthRejectsWrongToken(t *testing.T) {
 }
 
 func TestAuthAcceptsBearerToken(t *testing.T) {
-	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
+	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
 		return ReportResult{}, nil
 	}, Options{AuthToken: "secret"})
 	recorder := httptest.NewRecorder()
@@ -158,7 +195,7 @@ func TestReportsListIncludesSummaryCounts(t *testing.T) {
 			Items:       []model.NewsItem{{Title: "测试一"}, {Title: "库存条目"}},
 		},
 	}
-	router := NewRouter(repo, func(context.Context) (ReportResult, error) {
+	router := NewRouter(repo, func(context.Context, RunReportRequest) (ReportResult, error) {
 		return ReportResult{}, nil
 	}, Options{})
 	recorder := httptest.NewRecorder()
@@ -189,7 +226,7 @@ func TestReportsListKeepsItemCountAndDisplayCountIndependent(t *testing.T) {
 			},
 		},
 	}
-	router := NewRouter(repo, func(context.Context) (ReportResult, error) {
+	router := NewRouter(repo, func(context.Context, RunReportRequest) (ReportResult, error) {
 		return ReportResult{}, nil
 	}, Options{})
 	recorder := httptest.NewRecorder()
@@ -207,7 +244,7 @@ func TestReportsListKeepsItemCountAndDisplayCountIndependent(t *testing.T) {
 }
 
 func TestHealthSkipsAuth(t *testing.T) {
-	router := NewRouter(newMemoryRepository(), func(context.Context) (ReportResult, error) {
+	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
 		return ReportResult{}, nil
 	}, Options{AuthToken: "secret"})
 	recorder := httptest.NewRecorder()

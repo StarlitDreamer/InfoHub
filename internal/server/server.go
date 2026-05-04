@@ -11,10 +11,23 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"InfoHub-agent/internal/repository"
+	"InfoHub-agent/internal/service"
 )
 
 // ReportRunner 表示可被 HTTP 触发的日报生成任务。
-type ReportRunner func(context.Context) (ReportResult, error)
+type ReportRunner func(context.Context, RunReportRequest) (ReportResult, error)
+
+// RunReportRequest 表示 HTTP 触发日报生成时的可选参数。
+type RunReportRequest struct {
+	Preference PreferenceRequest `json:"preference"`
+}
+
+// PreferenceRequest 表示一次请求的个性化偏好参数。
+type PreferenceRequest struct {
+	Tags     []string `json:"tags"`
+	Sources  []string `json:"sources"`
+	Keywords []string `json:"keywords"`
+}
 
 // ReportResult 表示一次日报生成结果摘要。
 type ReportResult struct {
@@ -43,7 +56,15 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Op
 	protected.Use(authMiddleware(options.AuthToken))
 
 	protected.POST("/reports/run", func(ctx *gin.Context) {
-		result, err := runner(ctx.Request.Context())
+		var request RunReportRequest
+		if ctx.Request.ContentLength > 0 {
+			if err := ctx.ShouldBindJSON(&request); err != nil {
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+				return
+			}
+		}
+
+		result, err := runner(ctx.Request.Context(), request)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -104,5 +125,14 @@ func authMiddleware(token string) gin.HandlerFunc {
 		}
 
 		ctx.Next()
+	}
+}
+
+// ToUserPreference 转换为 service 层使用的偏好结构。
+func (r PreferenceRequest) ToUserPreference() service.UserPreference {
+	return service.UserPreference{
+		Tags:     append([]string(nil), r.Tags...),
+		Sources:  append([]string(nil), r.Sources...),
+		Keywords: append([]string(nil), r.Keywords...),
 	}
 }
