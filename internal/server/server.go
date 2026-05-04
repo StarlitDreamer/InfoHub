@@ -166,7 +166,7 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Op
 			"items":              record.Items,
 			"display_count":      repository.CountDisplayItems(record.Markdown),
 			"decision_summary":   buildDecisionSummary(record.Items, 3),
-			"top_priority_items": buildTopPriorityTitles(record.Items, 3),
+			"top_priority_items": repository.TopTitles(record.Items, 3),
 		})
 	})
 
@@ -233,26 +233,6 @@ func buildDecisionSummary(items []model.NewsItem, limit int) []reportDecisionSum
 			Action:  summarizeAction(item),
 			Summary: summarizeWhatHappened(item),
 		})
-	}
-
-	return result
-}
-
-func buildTopPriorityTitles(items []model.NewsItem, limit int) []string {
-	if limit <= 0 {
-		limit = 1
-	}
-	if len(items) > limit {
-		items = items[:limit]
-	}
-
-	result := make([]string, 0, len(items))
-	for _, item := range items {
-		title := strings.TrimSpace(item.Title)
-		if title == "" {
-			continue
-		}
-		result = append(result, title)
 	}
 
 	return result

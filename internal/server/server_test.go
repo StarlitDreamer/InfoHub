@@ -227,7 +227,10 @@ func TestReportsListIncludesSummaryCounts(t *testing.T) {
 		{
 			GeneratedAt: time.Date(2026, 5, 3, 16, 0, 0, 0, time.UTC),
 			Markdown:    "# 今日信息日报\n\n## 今日概览\n- 收录条目：2\n\n## ⭐⭐⭐ 测试一\n- 标题：测试一\n",
-			Items:       []model.NewsItem{{Title: "测试一"}, {Title: "库存条目"}},
+			Items: []model.NewsItem{
+				{Title: "测试一", Score: 4},
+				{Title: "库存条目", Score: 2},
+			},
 		},
 	}
 	router := NewRouter(repo, func(context.Context, RunReportRequest) (ReportResult, error) {
@@ -244,6 +247,9 @@ func TestReportsListIncludesSummaryCounts(t *testing.T) {
 	body := recorder.Body.String()
 	if !strings.Contains(body, `"item_count":2`) || !strings.Contains(body, `"display_count":1`) {
 		t.Fatalf("expected reports list to include summary counts, got %s", body)
+	}
+	if !strings.Contains(body, `"high_priority_count":1`) || !strings.Contains(body, `"top_titles":["测试一","库存条目"]`) {
+		t.Fatalf("expected reports list to include quick summary fields, got %s", body)
 	}
 }
 
@@ -359,10 +365,12 @@ func (r *memoryRepository) List(ctx context.Context) ([]repository.ReportMetadat
 	result := make([]repository.ReportMetadata, 0, len(r.records))
 	for _, record := range r.records {
 		result = append(result, repository.ReportMetadata{
-			Name:         record.GeneratedAt.Format("20060102-150405"),
-			ItemCount:    len(record.Items),
-			DisplayCount: repository.CountDisplayItems(record.Markdown),
-			CreatedAt:    record.GeneratedAt,
+			Name:              record.GeneratedAt.Format("20060102-150405"),
+			ItemCount:         len(record.Items),
+			DisplayCount:      repository.CountDisplayItems(record.Markdown),
+			HighPriorityCount: repository.CountHighPriorityItems(record.Items),
+			TopTitles:         repository.TopTitles(record.Items, 2),
+			CreatedAt:         record.GeneratedAt,
 		})
 	}
 

@@ -50,14 +50,16 @@ type UserPreferenceRepository interface {
 	Get(ctx context.Context, userID string) (UserPreferenceRecord, error)
 }
 
-// ReportMetadata 表示历史日报的文件索引信息。
+// ReportMetadata 表示历史日报的索引信息。
 type ReportMetadata struct {
-	Name         string    `json:"name"`
-	Markdown     string    `json:"markdown"`
-	Items        string    `json:"items"`
-	ItemCount    int       `json:"item_count"`
-	DisplayCount int       `json:"display_count"`
-	CreatedAt    time.Time `json:"created_at"`
+	Name              string    `json:"name"`
+	Markdown          string    `json:"markdown"`
+	Items             string    `json:"items"`
+	ItemCount         int       `json:"item_count"`
+	DisplayCount      int       `json:"display_count"`
+	HighPriorityCount int       `json:"high_priority_count"`
+	TopTitles         []string  `json:"top_titles"`
+	CreatedAt         time.Time `json:"created_at"`
 }
 
 // CountDisplayItems 统计日报中实际展示的信息条目数量。
@@ -68,29 +70,48 @@ func CountDisplayItems(markdown string) int {
 		if !strings.HasPrefix(line, "## ") {
 			continue
 		}
-		if line == "## 今日概览" {
-			continue
-		}
 		if strings.HasPrefix(line, "### ") {
 			continue
 		}
-		if line == "## Overview" {
-			continue
-		}
-		if line == "## Summary" {
-			continue
-		}
-		if line == "## Today's Overview" {
-			continue
-		}
-		if line == "## Today Overview" {
-			continue
-		}
-		if line == "## Highlights" {
+		switch line {
+		case "## 今日概览", "## Overview", "## Summary", "## Today's Overview", "## Today Overview", "## Highlights":
 			continue
 		}
 		count++
 	}
 
 	return count
+}
+
+// CountHighPriorityItems 统计高优先级条目数量。
+func CountHighPriorityItems(items []model.NewsItem) int {
+	count := 0
+	for _, item := range items {
+		if item.Score >= 4 {
+			count++
+		}
+	}
+
+	return count
+}
+
+// TopTitles 返回前 n 个重点标题。
+func TopTitles(items []model.NewsItem, limit int) []string {
+	if limit <= 0 {
+		limit = 1
+	}
+
+	result := make([]string, 0, limit)
+	for _, item := range items {
+		title := strings.TrimSpace(item.Title)
+		if title == "" {
+			continue
+		}
+		result = append(result, title)
+		if len(result) == limit {
+			break
+		}
+	}
+
+	return result
 }
