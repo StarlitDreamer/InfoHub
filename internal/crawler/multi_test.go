@@ -22,6 +22,9 @@ func TestMultiCrawlerFetchesAllSuccessfulSources(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("expected 2 items, got %d", len(items))
 	}
+	if len(crawler.Warnings()) != 0 {
+		t.Fatalf("expected no warnings, got %+v", crawler.Warnings())
+	}
 }
 
 func TestMultiCrawlerKeepsSuccessfulSourcesWhenSomeFail(t *testing.T) {
@@ -36,6 +39,10 @@ func TestMultiCrawlerKeepsSuccessfulSourcesWhenSomeFail(t *testing.T) {
 	}
 	if len(items) != 1 || items[0].Title != "成功数据" {
 		t.Fatalf("unexpected partial fetch result: %+v", items)
+	}
+	warnings := crawler.Warnings()
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "feed-a: fetch failed") {
+		t.Fatalf("expected partial failure warning, got %+v", warnings)
 	}
 }
 

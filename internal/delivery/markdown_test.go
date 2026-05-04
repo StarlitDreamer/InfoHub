@@ -103,6 +103,16 @@ func TestRenderMarkdownOverviewSummarizesSourcesAndTopItems(t *testing.T) {
 	}
 }
 
+func TestRenderMarkdownWithWarningsIncludesFetchFailures(t *testing.T) {
+	report := RenderMarkdownWithWarnings([]model.NewsItem{
+		{Title: "alpha", Content: "a", Source: "OpenAI News", Score: 5},
+	}, []string{"openai-news: timed out", "google-rss: status 500"})
+
+	if !strings.Contains(report, "- 抓取异常：openai-news: timed out；google-rss: status 500") {
+		t.Fatalf("expected warning summary, got %s", report)
+	}
+}
+
 func TestRecommendActionUsesScoreAndTopicSignals(t *testing.T) {
 	high := summary.RecommendAction(model.NewsItem{Score: 5}, summary.Structured{})
 	if !strings.Contains(high.Description, "优先安排评审") {

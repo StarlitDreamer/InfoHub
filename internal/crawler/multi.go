@@ -10,7 +10,8 @@ import (
 
 // MultiCrawler 聚合多个数据采集器。
 type MultiCrawler struct {
-	crawlers []Crawler
+	crawlers     []Crawler
+	lastWarnings []string
 }
 
 // NewMultiCrawler 创建多源聚合采集器。
@@ -22,6 +23,7 @@ func NewMultiCrawler(crawlers []Crawler) *MultiCrawler {
 func (c *MultiCrawler) Fetch(ctx context.Context) ([]model.NewsItem, error) {
 	var messages []string
 	items := make([]model.NewsItem, 0)
+	c.lastWarnings = nil
 
 	for index, crawler := range c.crawlers {
 		if err := ctx.Err(); err != nil {
@@ -40,8 +42,16 @@ func (c *MultiCrawler) Fetch(ctx context.Context) ([]model.NewsItem, error) {
 	if len(items) == 0 && len(messages) > 0 {
 		return nil, fmt.Errorf("all sources failed: %s", strings.Join(messages, "; "))
 	}
+	if len(messages) > 0 {
+		c.lastWarnings = append([]string(nil), messages...)
+	}
 
 	return items, nil
+}
+
+// Warnings 返回最近一次抓取中被保留下来的部分失败信息。
+func (c *MultiCrawler) Warnings() []string {
+	return append([]string(nil), c.lastWarnings...)
 }
 
 func sourceLabel(crawler Crawler, index int) string {

@@ -31,6 +31,10 @@ type MarkdownSender interface {
 	Send(markdown string) error
 }
 
+type warningProvider interface {
+	Warnings() []string
+}
+
 // Result 表示一次 Agent 执行结果。
 type Result struct {
 	ItemCount    int
@@ -38,6 +42,7 @@ type Result struct {
 	GeneratedAt  time.Time
 	Markdown     string
 	Items        []model.NewsItem
+	Warnings     []string
 	Request      AgentRequest
 }
 
@@ -105,10 +110,11 @@ func (a *Agent) RunWithRequest(ctx context.Context, request AgentRequest) (Resul
 	sortedItems := SortByPreferenceScore(items, request.Context.Preference, a.now())
 	sortedItems = applySourcePriority(sortedItems, request)
 	displayItems := LimitItemsBalancedBySource(filterReportItems(sortedItems, request), a.reportMaxItems)
+	warnings := pipelineWarnings(a.pipeline)
 
-	report := delivery.RenderMarkdown(displayItems)
+	report := delivery.RenderMarkdownWithWarnings(displayItems, warnings)
 	if a.groupBySource {
-		report = delivery.RenderMarkdownBySource(displayItems)
+		report = delivery.RenderMarkdownBySourceWithWarnings(displayItems, warnings)
 	}
 
 	generatedAt := a.now()
@@ -135,8 +141,18 @@ func (a *Agent) RunWithRequest(ctx context.Context, request AgentRequest) (Resul
 		GeneratedAt:  generatedAt,
 		Markdown:     report,
 		Items:        sortedItems,
+		Warnings:     warnings,
 		Request:      normalizeAgentRequest(request, generatedAt),
 	}, nil
+}
+
+func pipelineWarnings(pipeline PipelineRunner) []string {
+	provider, ok := pipeline.(warningProvider)
+	if !ok {
+		return nil
+	}
+
+	return provider.Warnings()
 }
 
 func normalizeAgentRequest(request AgentRequest, requestedAt time.Time) AgentRequest {

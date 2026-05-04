@@ -230,6 +230,31 @@ func TestAgentRunBalancesDisplayedItemsAcrossSources(t *testing.T) {
 	}
 }
 
+func TestAgentRunIncludesPipelineWarningsInMarkdown(t *testing.T) {
+	fixedNow := time.Date(2026, 5, 3, 20, 0, 0, 0, time.UTC)
+	agent := NewAgent(
+		warningPipelineRunner{
+			items:    []model.NewsItem{{Title: "beta", Content: "body b", Score: 4, PublishTime: fixedNow.Add(-1 * time.Hour)}},
+			warnings: []string{"openai-news: timed out"},
+		},
+		&agentRepositoryStub{},
+		AgentOptions{
+			Now: func() time.Time { return fixedNow },
+		},
+	)
+
+	result, err := agent.Run(context.Background())
+	if err != nil {
+		t.Fatalf("agent run failed: %v", err)
+	}
+	if len(result.Warnings) != 1 || result.Warnings[0] != "openai-news: timed out" {
+		t.Fatalf("expected warnings in result, got %+v", result.Warnings)
+	}
+	if !strings.Contains(result.Markdown, "- 抓取异常：openai-news: timed out") {
+		t.Fatalf("expected markdown warning, got %s", result.Markdown)
+	}
+}
+
 func TestAgentRunAppliesPreferenceBoostBeforeSourcePriority(t *testing.T) {
 	fixedNow := time.Date(2026, 5, 3, 20, 0, 0, 0, time.UTC)
 	repo := &agentRepositoryStub{}
@@ -335,6 +360,19 @@ type errorPipelineRunner struct {
 
 func (r errorPipelineRunner) RunContext(ctx context.Context) ([]model.NewsItem, error) {
 	return nil, r.err
+}
+
+type warningPipelineRunner struct {
+	items    []model.NewsItem
+	warnings []string
+}
+
+func (r warningPipelineRunner) RunContext(ctx context.Context) ([]model.NewsItem, error) {
+	return r.items, nil
+}
+
+func (r warningPipelineRunner) Warnings() []string {
+	return append([]string(nil), r.warnings...)
 }
 
 type agentRepositoryStub struct {

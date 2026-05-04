@@ -1,4 +1,3 @@
-// Package delivery 提供日报输出和推送能力。
 package delivery
 
 import (
@@ -11,15 +10,25 @@ import (
 
 // RenderMarkdown 将信息列表渲染为 Markdown 日报。
 func RenderMarkdown(items []model.NewsItem) string {
-	return renderMarkdown(items, false)
+	return renderMarkdown(items, nil, false)
+}
+
+// RenderMarkdownWithWarnings 渲染带抓取告警的 Markdown 日报。
+func RenderMarkdownWithWarnings(items []model.NewsItem, warnings []string) string {
+	return renderMarkdown(items, warnings, false)
 }
 
 // RenderMarkdownBySource 按来源分组渲染 Markdown 日报。
 func RenderMarkdownBySource(items []model.NewsItem) string {
-	return renderMarkdown(items, true)
+	return renderMarkdown(items, nil, true)
 }
 
-func renderMarkdown(items []model.NewsItem, groupBySource bool) string {
+// RenderMarkdownBySourceWithWarnings 渲染按来源分组且带抓取告警的日报。
+func RenderMarkdownBySourceWithWarnings(items []model.NewsItem, warnings []string) string {
+	return renderMarkdown(items, warnings, true)
+}
+
+func renderMarkdown(items []model.NewsItem, warnings []string, groupBySource bool) string {
 	var builder strings.Builder
 	builder.WriteString("# 今日信息日报\n\n")
 
@@ -28,7 +37,7 @@ func renderMarkdown(items []model.NewsItem, groupBySource bool) string {
 		return builder.String()
 	}
 
-	renderOverview(&builder, items)
+	renderOverview(&builder, items, warnings)
 
 	if groupBySource {
 		renderGroupedItems(&builder, items)
@@ -42,7 +51,7 @@ func renderMarkdown(items []model.NewsItem, groupBySource bool) string {
 	return builder.String()
 }
 
-func renderOverview(builder *strings.Builder, items []model.NewsItem) {
+func renderOverview(builder *strings.Builder, items []model.NewsItem, warnings []string) {
 	overview := summary.BuildOverview(items, 3, 3)
 
 	builder.WriteString("## 今日概览\n")
@@ -56,6 +65,9 @@ func renderOverview(builder *strings.Builder, items []model.NewsItem) {
 		for _, action := range overview.PriorityActions {
 			builder.WriteString(fmt.Sprintf("  - %s\n", action))
 		}
+	}
+	if len(warnings) > 0 {
+		builder.WriteString(fmt.Sprintf("- 抓取异常：%s\n", strings.Join(warnings, "；")))
 	}
 
 	builder.WriteString("\n")
@@ -110,7 +122,6 @@ func joinOrDefault(values []string, sep, fallback string) string {
 	return strings.Join(values, sep)
 }
 
-// scoreStars 将 1-5 分评分转换为星级展示。
 func scoreStars(score float64) string {
 	return strings.Repeat("⭐", int(clampScore(score)))
 }

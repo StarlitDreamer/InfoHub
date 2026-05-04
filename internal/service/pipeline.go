@@ -19,6 +19,10 @@ type Pipeline struct {
 	dedup   processor.DedupStore
 }
 
+type crawlerWarningProvider interface {
+	Warnings() []string
+}
+
 // NewPipeline 创建信息处理流程。
 func NewPipeline(crawler crawler.Crawler, ai ai.Processor) *Pipeline {
 	return &Pipeline{
@@ -81,6 +85,16 @@ func (p *Pipeline) RunContext(ctx context.Context) ([]model.NewsItem, error) {
 
 	sortNewsItemsByScore(result)
 	return result, nil
+}
+
+// Warnings 返回最近一次采集阶段留下的部分失败信息。
+func (p *Pipeline) Warnings() []string {
+	provider, ok := p.crawler.(crawlerWarningProvider)
+	if !ok {
+		return nil
+	}
+
+	return provider.Warnings()
 }
 
 func hasSeenAnyDedupKey(ctx context.Context, store processor.DedupStore, item model.NewsItem) (bool, error) {
