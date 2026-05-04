@@ -120,16 +120,15 @@ func (r *FileReportRepository) List(ctx context.Context) ([]ReportMetadata, erro
 			return nil, err
 		}
 
-		records = append(records, ReportMetadata{
-			Name:              name,
-			Markdown:          filepath.ToSlash(filepath.Join("reports", entry.Name())),
-			Items:             filepath.ToSlash(filepath.Join("items", name+".json")),
-			ItemCount:         len(items),
-			DisplayCount:      CountDisplayItems(string(markdownContent)),
-			HighPriorityCount: CountHighPriorityItems(items),
-			TopTitles:         TopTitles(items, 2),
-			CreatedAt:         createdAt,
-		})
+		records = append(records, BuildReportMetadata(
+			name,
+			filepath.ToSlash(filepath.Join("reports", entry.Name())),
+			filepath.ToSlash(filepath.Join("items", name+".json")),
+			string(markdownContent),
+			items,
+			createdAt,
+			2,
+		))
 	}
 
 	sort.SliceStable(records, func(i, j int) bool {

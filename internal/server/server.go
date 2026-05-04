@@ -225,10 +225,11 @@ func (r PreferenceRequest) ToUserPreference() service.UserPreference {
 }
 
 func buildReportOverview(markdown string, items []model.NewsItem, limit int) reportOverview {
+	base := repository.BuildReportOverview(markdown, items, limit)
 	return reportOverview{
-		DisplayCount:      repository.CountDisplayItems(markdown),
-		HighPriorityCount: repository.CountHighPriorityItems(items),
-		TopPriorityItems:  repository.TopTitles(items, limit),
+		DisplayCount:      base.DisplayCount,
+		HighPriorityCount: base.HighPriorityCount,
+		TopPriorityItems:  base.TopTitles,
 		DecisionSummary:   buildDecisionSummary(items, limit),
 	}
 }

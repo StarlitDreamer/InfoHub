@@ -62,6 +62,13 @@ type ReportMetadata struct {
 	CreatedAt         time.Time `json:"created_at"`
 }
 
+// ReportOverview 表示一份日报的轻量摘要信息。
+type ReportOverview struct {
+	DisplayCount      int
+	HighPriorityCount int
+	TopTitles         []string
+}
+
 // CountDisplayItems 统计日报中实际展示的信息条目数量。
 func CountDisplayItems(markdown string) int {
 	count := 0
@@ -114,4 +121,28 @@ func TopTitles(items []model.NewsItem, limit int) []string {
 	}
 
 	return result
+}
+
+// BuildReportOverview 生成日报轻量摘要。
+func BuildReportOverview(markdown string, items []model.NewsItem, limit int) ReportOverview {
+	return ReportOverview{
+		DisplayCount:      CountDisplayItems(markdown),
+		HighPriorityCount: CountHighPriorityItems(items),
+		TopTitles:         TopTitles(items, limit),
+	}
+}
+
+// BuildReportMetadata 根据日报内容生成统一的索引元数据。
+func BuildReportMetadata(name, markdownPath, itemsPath, markdown string, items []model.NewsItem, createdAt time.Time, titleLimit int) ReportMetadata {
+	overview := BuildReportOverview(markdown, items, titleLimit)
+	return ReportMetadata{
+		Name:              name,
+		Markdown:          markdownPath,
+		Items:             itemsPath,
+		ItemCount:         len(items),
+		DisplayCount:      overview.DisplayCount,
+		HighPriorityCount: overview.HighPriorityCount,
+		TopTitles:         overview.TopTitles,
+		CreatedAt:         createdAt,
+	}
 }

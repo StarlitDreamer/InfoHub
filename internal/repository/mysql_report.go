@@ -120,14 +120,15 @@ func (r *MySQLReportRepository) List(ctx context.Context) ([]ReportMetadata, err
 			return nil, err
 		}
 
-		records = append(records, ReportMetadata{
-			Name:              generatedAt.UTC().Format("20060102-150405"),
-			ItemCount:         len(items),
-			DisplayCount:      CountDisplayItems(markdown),
-			HighPriorityCount: CountHighPriorityItems(items),
-			TopTitles:         TopTitles(items, 2),
-			CreatedAt:         generatedAt,
-		})
+		records = append(records, BuildReportMetadata(
+			generatedAt.UTC().Format("20060102-150405"),
+			"",
+			"",
+			markdown,
+			items,
+			generatedAt,
+			2,
+		))
 	}
 
 	if err := rows.Err(); err != nil {
