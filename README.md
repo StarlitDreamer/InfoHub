@@ -9,7 +9,7 @@ InfoHub Agent is an information aggregation and decision-support service. It col
 - In-run and cross-run deduplication
 - Markdown report rendering
 - File-backed or MySQL-backed report storage
-- Webhook delivery
+- Webhook and email delivery
 - Manual run, scheduler mode, and Gin HTTP API
 - JSON config plus environment variable overrides
 - Redis-backed dedup store
@@ -109,6 +109,13 @@ Common environment variables:
 - `INFOHUB_AI_API_KEY`
 - `INFOHUB_AI_MODEL`
 - `INFOHUB_WEBHOOK_URL`
+- `INFOHUB_SMTP_HOST`
+- `INFOHUB_SMTP_PORT`
+- `INFOHUB_SMTP_USERNAME`
+- `INFOHUB_SMTP_PASSWORD`
+- `INFOHUB_EMAIL_FROM`
+- `INFOHUB_EMAIL_TO`
+- `INFOHUB_EMAIL_SUBJECT`
 - `INFOHUB_SEND_EMPTY_REPORT`
 - `INFOHUB_STORAGE_DIR`
 - `INFOHUB_DEDUP_STORE_PATH`

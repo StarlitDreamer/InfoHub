@@ -16,6 +16,8 @@ const defaultHTTPAddr = ":8080"
 const defaultDedupStorePath = "data/dedup/seen.json"
 const defaultRedisDedupKey = "infohub:dedup:seen"
 const defaultMySQLTable = "reports"
+const defaultSMTPPort = 25
+const defaultEmailSubject = "InfoHub 每日报告"
 
 // Config 保存信息汇总 Agent 的运行配置。
 type Config struct {
@@ -30,6 +32,13 @@ type Config struct {
 	AIAPIKey            string
 	AIModel             string
 	WebhookURL          string
+	SMTPHost            string
+	SMTPPort            int
+	SMTPUsername        string
+	SMTPPassword        string
+	EmailFrom           string
+	EmailTo             []string
+	EmailSubject        string
 	ScheduleInterval    time.Duration
 	StorageDir          string
 	HTTPAddr            string
@@ -130,6 +139,11 @@ func (c Config) UseWebhook() bool {
 	return c.WebhookURL != ""
 }
 
+// UseEmail 判断是否启用邮件推送。
+func (c Config) UseEmail() bool {
+	return c.SMTPHost != "" && c.EmailFrom != "" && len(c.EmailTo) > 0
+}
+
 // UseMySQL 判断是否启用 MySQL 日报存储。
 func (c Config) UseMySQL() bool {
 	return c.MySQLDSN != ""
@@ -143,6 +157,8 @@ func defaultConfig() Config {
 		DedupStorePath:   defaultDedupStorePath,
 		RedisDedupKey:    defaultRedisDedupKey,
 		MySQLTable:       defaultMySQLTable,
+		SMTPPort:         defaultSMTPPort,
+		EmailSubject:     defaultEmailSubject,
 	}
 }
 
@@ -194,6 +210,27 @@ func mergeConfig(base, override Config) Config {
 	}
 	if override.WebhookURL != "" {
 		base.WebhookURL = override.WebhookURL
+	}
+	if override.SMTPHost != "" {
+		base.SMTPHost = override.SMTPHost
+	}
+	if override.SMTPPort > 0 {
+		base.SMTPPort = override.SMTPPort
+	}
+	if override.SMTPUsername != "" {
+		base.SMTPUsername = override.SMTPUsername
+	}
+	if override.SMTPPassword != "" {
+		base.SMTPPassword = override.SMTPPassword
+	}
+	if override.EmailFrom != "" {
+		base.EmailFrom = override.EmailFrom
+	}
+	if len(override.EmailTo) > 0 {
+		base.EmailTo = override.EmailTo
+	}
+	if override.EmailSubject != "" {
+		base.EmailSubject = override.EmailSubject
 	}
 	if override.ScheduleInterval != 0 {
 		base.ScheduleInterval = override.ScheduleInterval
@@ -248,6 +285,13 @@ func applyEnv(cfg Config) Config {
 	cfg.AIAPIKey = readString("INFOHUB_AI_API_KEY", cfg.AIAPIKey)
 	cfg.AIModel = readString("INFOHUB_AI_MODEL", cfg.AIModel)
 	cfg.WebhookURL = readString("INFOHUB_WEBHOOK_URL", cfg.WebhookURL)
+	cfg.SMTPHost = readString("INFOHUB_SMTP_HOST", cfg.SMTPHost)
+	cfg.SMTPPort = readInt("INFOHUB_SMTP_PORT", cfg.SMTPPort)
+	cfg.SMTPUsername = readString("INFOHUB_SMTP_USERNAME", cfg.SMTPUsername)
+	cfg.SMTPPassword = readString("INFOHUB_SMTP_PASSWORD", cfg.SMTPPassword)
+	cfg.EmailFrom = readString("INFOHUB_EMAIL_FROM", cfg.EmailFrom)
+	cfg.EmailTo = readList("INFOHUB_EMAIL_TO", strings.Join(cfg.EmailTo, ","))
+	cfg.EmailSubject = readString("INFOHUB_EMAIL_SUBJECT", cfg.EmailSubject)
 	cfg.ScheduleInterval = readDuration("INFOHUB_SCHEDULE_INTERVAL_SECONDS", cfg.ScheduleInterval)
 	cfg.StorageDir = readString("INFOHUB_STORAGE_DIR", cfg.StorageDir)
 	cfg.HTTPAddr = readString("INFOHUB_HTTP_ADDR", cfg.HTTPAddr)
@@ -285,6 +329,15 @@ type fileConfig struct {
 		URL             string `json:"url"`
 		SendEmptyReport bool   `json:"send_empty_report"`
 	} `json:"webhook"`
+	Email struct {
+		SMTPHost string   `json:"smtp_host"`
+		SMTPPort int      `json:"smtp_port"`
+		Username string   `json:"username"`
+		Password string   `json:"password"`
+		From     string   `json:"from"`
+		To       []string `json:"to"`
+		Subject  string   `json:"subject"`
+	} `json:"email"`
 	Storage struct {
 		Dir string `json:"dir"`
 	} `json:"storage"`
@@ -333,6 +386,13 @@ func (f fileConfig) toConfig() Config {
 		AIAPIKey:            f.AI.APIKey,
 		AIModel:             f.AI.Model,
 		WebhookURL:          f.Webhook.URL,
+		SMTPHost:            f.Email.SMTPHost,
+		SMTPPort:            firstPositive(f.Email.SMTPPort, defaultSMTPPort),
+		SMTPUsername:        f.Email.Username,
+		SMTPPassword:        f.Email.Password,
+		EmailFrom:           f.Email.From,
+		EmailTo:             append([]string(nil), f.Email.To...),
+		EmailSubject:        firstNonEmpty(f.Email.Subject, defaultEmailSubject),
 		SendEmptyReport:     f.Webhook.SendEmptyReport,
 		StorageDir:          f.Storage.Dir,
 		HTTPAddr:            f.HTTP.Addr,
@@ -473,6 +533,16 @@ func firstNonEmpty(values ...string) string {
 	}
 
 	return ""
+}
+
+func firstPositive(values ...int) int {
+	for _, value := range values {
+		if value > 0 {
+			return value
+		}
+	}
+
+	return 0
 }
 
 func cloneStringMap(input map[string]string) map[string]string {

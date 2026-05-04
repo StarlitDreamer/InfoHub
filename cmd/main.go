@@ -74,9 +74,7 @@ func runReportWithRepository(ctx context.Context, cfg config.Config, repo reposi
 		GroupBySource:   cfg.ReportGroupBySource,
 		ReportMaxItems:  cfg.ReportMaxItems,
 		Now:             timeNow,
-	}
-	if cfg.UseWebhook() {
-		options.WebhookSender = delivery.NewWebhookSender(cfg.WebhookURL, nil)
+		Senders:         buildSenders(cfg),
 	}
 
 	agent := service.NewAgent(pipeline, repo, options)
@@ -204,4 +202,24 @@ func newReportRepository(cfg config.Config) (repository.ReportRepository, func()
 
 	repo := repository.NewFileReportRepository(cfg.StorageDir)
 	return repo, func() error { return nil }, nil
+}
+
+func buildSenders(cfg config.Config) []service.MarkdownSender {
+	senders := make([]service.MarkdownSender, 0, 2)
+	if cfg.UseWebhook() {
+		senders = append(senders, delivery.NewWebhookSender(cfg.WebhookURL, nil))
+	}
+	if cfg.UseEmail() {
+		senders = append(senders, delivery.NewEmailSender(
+			cfg.SMTPHost,
+			cfg.SMTPPort,
+			cfg.SMTPUsername,
+			cfg.SMTPPassword,
+			cfg.EmailFrom,
+			cfg.EmailTo,
+			cfg.EmailSubject,
+		))
+	}
+
+	return senders
 }

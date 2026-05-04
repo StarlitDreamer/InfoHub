@@ -105,8 +105,8 @@ func TestAgentRunSendsWebhookWhenConfigured(t *testing.T) {
 		},
 		&agentRepositoryStub{},
 		AgentOptions{
-			WebhookSender: sender,
-			Now:           func() time.Time { return fixedNow },
+			Senders: []MarkdownSender{sender},
+			Now:     func() time.Time { return fixedNow },
 		},
 	)
 
@@ -191,7 +191,7 @@ func TestAgentRunSkipsEmptyWebhookByDefault(t *testing.T) {
 		staticPipelineRunner{},
 		&agentRepositoryStub{},
 		AgentOptions{
-			WebhookSender: &senderStub{},
+			Senders: []MarkdownSender{&senderStub{}},
 		},
 	)
 
@@ -215,6 +215,31 @@ func TestAgentRunPropagatesPipelineError(t *testing.T) {
 	_, err := agent.Run(context.Background())
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("expected pipeline error, got %v", err)
+	}
+}
+
+func TestAgentRunSendsAllConfiguredSenders(t *testing.T) {
+	fixedNow := time.Date(2026, 5, 3, 20, 0, 0, 0, time.UTC)
+	first := &senderStub{}
+	second := &senderStub{}
+	agent := NewAgent(
+		staticPipelineRunner{
+			items: []model.NewsItem{
+				{Title: "beta", Content: "body b", Score: 4, PublishTime: fixedNow.Add(-1 * time.Hour)},
+			},
+		},
+		&agentRepositoryStub{},
+		AgentOptions{
+			Senders: []MarkdownSender{first, second},
+			Now:     func() time.Time { return fixedNow },
+		},
+	)
+
+	if _, err := agent.Run(context.Background()); err != nil {
+		t.Fatalf("agent run failed: %v", err)
+	}
+	if first.calls != 1 || second.calls != 1 {
+		t.Fatalf("expected all senders to be called once, got %d and %d", first.calls, second.calls)
 	}
 }
 

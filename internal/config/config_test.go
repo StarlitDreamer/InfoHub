@@ -17,6 +17,13 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("INFOHUB_AI_API_KEY", "test-key")
 	t.Setenv("INFOHUB_AI_MODEL", "test-model")
 	t.Setenv("INFOHUB_WEBHOOK_URL", "https://example.com/webhook")
+	t.Setenv("INFOHUB_SMTP_HOST", "smtp.example.com")
+	t.Setenv("INFOHUB_SMTP_PORT", "587")
+	t.Setenv("INFOHUB_SMTP_USERNAME", "mailer")
+	t.Setenv("INFOHUB_SMTP_PASSWORD", "secret")
+	t.Setenv("INFOHUB_EMAIL_FROM", "robot@example.com")
+	t.Setenv("INFOHUB_EMAIL_TO", "alice@example.com,bob@example.com")
+	t.Setenv("INFOHUB_EMAIL_SUBJECT", "日报")
 	t.Setenv("INFOHUB_SCHEDULE_INTERVAL_SECONDS", "120")
 	t.Setenv("INFOHUB_STORAGE_DIR", "tmp/reports")
 	t.Setenv("INFOHUB_HTTP_ADDR", ":9090")
@@ -46,6 +53,15 @@ func TestLoadFromEnv(t *testing.T) {
 	}
 	if !cfg.UseWebhook() {
 		t.Fatal("expected webhook to be enabled")
+	}
+	if !cfg.UseEmail() {
+		t.Fatal("expected email to be enabled")
+	}
+	if cfg.SMTPHost != "smtp.example.com" || cfg.SMTPPort != 587 || cfg.SMTPUsername != "mailer" || cfg.SMTPPassword != "secret" {
+		t.Fatalf("unexpected smtp config: %+v", cfg)
+	}
+	if cfg.EmailFrom != "robot@example.com" || len(cfg.EmailTo) != 2 || cfg.EmailTo[1] != "bob@example.com" || cfg.EmailSubject != "日报" {
+		t.Fatalf("unexpected email config: %+v", cfg)
 	}
 	if cfg.ScheduleInterval != 120*time.Second {
 		t.Fatalf("expected 120s schedule interval, got %s", cfg.ScheduleInterval)
@@ -122,6 +138,7 @@ func TestLoadFromJSONFile(t *testing.T) {
   "report": {"max_items": 15, "group_by_source": true},
   "ai": {"endpoint": "https://api.example.com/v1/chat/completions", "api_key": "file-key", "model": "file-model"},
   "webhook": {"url": "https://example.com/webhook", "send_empty_report": true},
+  "email": {"smtp_host": "smtp.example.com", "smtp_port": 2525, "username": "mailer", "password": "secret", "from": "robot@example.com", "to": ["alice@example.com"], "subject": "文件日报"},
   "storage": {"dir": "file/reports"},
   "dedup": {"store_path": "file/dedup/seen.json"},
   "http": {"addr": ":7070"},
@@ -157,6 +174,9 @@ func TestLoadFromJSONFile(t *testing.T) {
 	}
 	if cfg.AIAPIKey != "file-key" {
 		t.Fatalf("expected file AI key, got %s", cfg.AIAPIKey)
+	}
+	if !cfg.UseEmail() || cfg.SMTPPort != 2525 || cfg.EmailSubject != "文件日报" {
+		t.Fatalf("unexpected email config: %+v", cfg)
 	}
 	if cfg.ScheduleInterval != 300*time.Second {
 		t.Fatalf("expected 300s interval, got %s", cfg.ScheduleInterval)

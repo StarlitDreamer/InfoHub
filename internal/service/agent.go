@@ -14,7 +14,7 @@ import (
 type Agent struct {
 	pipeline        PipelineRunner
 	repo            repository.ReportRepository
-	webhookSender   MarkdownSender
+	senders         []MarkdownSender
 	sendEmptyReport bool
 	groupBySource   bool
 	reportMaxItems  int
@@ -64,7 +64,7 @@ type AgentRequest struct {
 
 // AgentOptions 保存 Agent 运行选项。
 type AgentOptions struct {
-	WebhookSender   MarkdownSender
+	Senders         []MarkdownSender
 	SendEmptyReport bool
 	GroupBySource   bool
 	ReportMaxItems  int
@@ -81,7 +81,7 @@ func NewAgent(pipeline PipelineRunner, repo repository.ReportRepository, options
 	return &Agent{
 		pipeline:        pipeline,
 		repo:            repo,
-		webhookSender:   options.WebhookSender,
+		senders:         append([]MarkdownSender(nil), options.Senders...),
 		sendEmptyReport: options.SendEmptyReport,
 		groupBySource:   options.GroupBySource,
 		reportMaxItems:  options.ReportMaxItems,
@@ -120,9 +120,11 @@ func (a *Agent) RunWithRequest(ctx context.Context, request AgentRequest) (Resul
 		return Result{}, err
 	}
 
-	if a.webhookSender != nil && (len(sortedItems) > 0 || a.sendEmptyReport) {
-		if err := a.webhookSender.Send(report); err != nil {
-			return Result{}, err
+	if len(a.senders) > 0 && (len(sortedItems) > 0 || a.sendEmptyReport) {
+		for _, sender := range a.senders {
+			if err := sender.Send(report); err != nil {
+				return Result{}, err
+			}
 		}
 	}
 

@@ -15,6 +15,17 @@
     "url": "https://example.com/webhook",
     "send_empty_report": false
   },
+  "email": {
+    "smtp_host": "smtp.example.com",
+    "smtp_port": 587,
+    "username": "mailer@example.com",
+    "password": "replace-with-your-password",
+    "from": "mailer@example.com",
+    "to": [
+      "team@example.com"
+    ],
+    "subject": "InfoHub 每日报告"
+  },
   "storage": {
     "dir": "data/reports"
   },
