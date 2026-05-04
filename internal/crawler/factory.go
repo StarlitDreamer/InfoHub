@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -54,8 +55,8 @@ func wrapSourceCrawler(source config.SourceConfig, crawler Crawler) Crawler {
 	}
 }
 
-func (c sourceCrawler) Fetch() ([]model.NewsItem, error) {
-	items, err := c.crawler.Fetch()
+func (c sourceCrawler) Fetch(ctx context.Context) ([]model.NewsItem, error) {
+	items, err := c.crawler.Fetch(ctx)
 	if err != nil {
 		return nil, err
 	}

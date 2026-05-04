@@ -1,6 +1,8 @@
 package crawler
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,7 +18,7 @@ func TestRSSCrawlerFetchesItems(t *testing.T) {
 	}))
 	defer server.Close()
 
-	items, err := NewRSSCrawler(server.URL, server.Client(), nil, RSSOptions{}).Fetch()
+	items, err := NewRSSCrawler(server.URL, server.Client(), nil, RSSOptions{}).Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("fetch failed: %v", err)
 	}
@@ -33,7 +35,7 @@ func TestRSSCrawlerCleansHTMLDescription(t *testing.T) {
 	}))
 	defer server.Close()
 
-	items, err := NewRSSCrawler(server.URL, server.Client(), nil, RSSOptions{}).Fetch()
+	items, err := NewRSSCrawler(server.URL, server.Client(), nil, RSSOptions{}).Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("fetch failed: %v", err)
 	}
@@ -67,7 +69,7 @@ func TestRSSCrawlerFiltersByRecentWindowAndMaxItems(t *testing.T) {
 		Now: func() time.Time {
 			return now
 		},
-	}).Fetch()
+	}).Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("fetch failed: %v", err)
 	}
@@ -85,7 +87,7 @@ func TestRSSCrawlerIncludesFeedURLInStatusErrors(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := NewRSSCrawler(server.URL, server.Client(), nil, RSSOptions{}).Fetch()
+	_, err := NewRSSCrawler(server.URL, server.Client(), nil, RSSOptions{}).Fetch(context.Background())
 	if err == nil {
 		t.Fatal("expected fetch to fail")
 	}
@@ -93,5 +95,32 @@ func TestRSSCrawlerIncludesFeedURLInStatusErrors(t *testing.T) {
 	message := err.Error()
 	if !strings.Contains(message, server.URL) || !strings.Contains(message, "status code 404") {
 		t.Fatalf("expected url and status code in error, got %s", message)
+	}
+}
+
+func TestRSSCrawlerPrefersEncodedContent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`<?xml version="1.0"?>
+<rss xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>测试源</title><item><title>标题一</title><link>https://example.com/a</link><description>短摘要</description><content:encoded><![CDATA[<div><p>更完整的正文内容</p></div>]]></content:encoded><pubDate>Sun, 03 May 2026 10:00:00 +0800</pubDate></item></channel></rss>`))
+	}))
+	defer server.Close()
+
+	items, err := NewRSSCrawler(server.URL, server.Client(), nil, RSSOptions{}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("fetch failed: %v", err)
+	}
+	if len(items) != 1 || items[0].Content != "更完整的正文内容" {
+		t.Fatalf("expected encoded content to win, got %+v", items)
+	}
+}
+
+func TestRSSCrawlerRespectsCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := NewRSSCrawler("https://example.com/rss.xml", http.DefaultClient, nil, RSSOptions{}).Fetch(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context canceled, got %v", err)
 	}
 }

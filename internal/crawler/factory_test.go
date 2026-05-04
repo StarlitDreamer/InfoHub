@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -119,7 +120,7 @@ func TestWrapSourceCrawlerSetsSourceName(t *testing.T) {
 		items: []model.NewsItem{{Title: "item"}},
 	})
 
-	items, err := wrapped.Fetch()
+	items, err := wrapped.Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("wrapped fetch failed: %v", err)
 	}

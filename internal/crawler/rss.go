@@ -45,8 +45,8 @@ func (c *RSSCrawler) String() string {
 }
 
 // Fetch 拉取并解析 RSS 数据。
-func (c *RSSCrawler) Fetch() ([]model.NewsItem, error) {
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, c.url, nil)
+func (c *RSSCrawler) Fetch(ctx context.Context) ([]model.NewsItem, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build rss request for %s: %w", c.url, err)
 	}
@@ -72,7 +72,7 @@ func (c *RSSCrawler) Fetch() ([]model.NewsItem, error) {
 	items := make([]model.NewsItem, 0, len(feed.Channel.Items))
 	for index, item := range feed.Channel.Items {
 		title := processor.CleanText(item.Title, 200)
-		content := processor.CleanText(firstNonEmpty(item.Description, item.Title), 2000)
+		content := cleanRSSContent(item)
 		source := processor.CleanText(feed.Channel.Title, 100)
 		publishTime := parseRSSDate(item.PubDate, c.options.Now)
 
@@ -102,7 +102,13 @@ type rssItem struct {
 	Title       string `xml:"title"`
 	Link        string `xml:"link"`
 	Description string `xml:"description"`
+	Encoded     string `xml:"encoded"`
 	PubDate     string `xml:"pubDate"`
+}
+
+func cleanRSSContent(item rssItem) string {
+	value := firstNonEmpty(item.Encoded, item.Description, item.Title)
+	return processor.CleanText(value, 4000)
 }
 
 func (c *RSSCrawler) filterItems(items []model.NewsItem) []model.NewsItem {

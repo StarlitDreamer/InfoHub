@@ -249,7 +249,7 @@ func TestNewCrawlerFallsBackToDemoWhenSourceBuildFails(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected crawler, got %T", built)
 	}
-	items, err := wrapped.Fetch()
+	items, err := wrapped.Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("expected demo fallback fetch to succeed, got %v", err)
 	}

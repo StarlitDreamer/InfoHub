@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"context"
 	"time"
 
 	"InfoHub-agent/internal/model"
@@ -15,7 +16,11 @@ func NewDemoCrawler() *DemoCrawler {
 }
 
 // Fetch 采集模拟信息，暂不接入真实外部 API。
-func (c *DemoCrawler) Fetch() ([]model.NewsItem, error) {
+func (c *DemoCrawler) Fetch(ctx context.Context) ([]model.NewsItem, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 
 	return []model.NewsItem{

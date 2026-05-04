@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -14,7 +15,7 @@ func TestMultiCrawlerFetchesAllSuccessfulSources(t *testing.T) {
 		staticCrawler{items: []model.NewsItem{{Title: "第二条"}}},
 	})
 
-	items, err := crawler.Fetch()
+	items, err := crawler.Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("multi source fetch failed: %v", err)
 	}
@@ -29,7 +30,7 @@ func TestMultiCrawlerKeepsSuccessfulSourcesWhenSomeFail(t *testing.T) {
 		staticCrawler{items: []model.NewsItem{{Title: "成功数据"}}},
 	})
 
-	items, err := crawler.Fetch()
+	items, err := crawler.Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("expected partial failure to keep successful items: %v", err)
 	}
@@ -44,7 +45,7 @@ func TestMultiCrawlerReturnsSourceLabelsWhenAllSourcesFail(t *testing.T) {
 		errorCrawler{label: "feed-b", err: errors.New("timed out")},
 	})
 
-	_, err := crawler.Fetch()
+	_, err := crawler.Fetch(context.Background())
 	if err == nil {
 		t.Fatal("expected error when all sources fail")
 	}
@@ -58,7 +59,7 @@ type staticCrawler struct {
 	items []model.NewsItem
 }
 
-func (c staticCrawler) Fetch() ([]model.NewsItem, error) {
+func (c staticCrawler) Fetch(ctx context.Context) ([]model.NewsItem, error) {
 	return c.items, nil
 }
 
@@ -67,7 +68,7 @@ type errorCrawler struct {
 	err   error
 }
 
-func (c errorCrawler) Fetch() ([]model.NewsItem, error) {
+func (c errorCrawler) Fetch(ctx context.Context) ([]model.NewsItem, error) {
 	return nil, c.err
 }
 

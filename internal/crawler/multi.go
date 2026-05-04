@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -18,12 +19,16 @@ func NewMultiCrawler(crawlers []Crawler) *MultiCrawler {
 }
 
 // Fetch 依次采集多个来源，部分失败时保留成功来源的数据。
-func (c *MultiCrawler) Fetch() ([]model.NewsItem, error) {
+func (c *MultiCrawler) Fetch(ctx context.Context) ([]model.NewsItem, error) {
 	var messages []string
 	items := make([]model.NewsItem, 0)
 
 	for index, crawler := range c.crawlers {
-		fetched, err := crawler.Fetch()
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		fetched, err := crawler.Fetch(ctx)
 		if err != nil {
 			messages = append(messages, fmt.Sprintf("%s: %v", sourceLabel(crawler, index), err))
 			continue

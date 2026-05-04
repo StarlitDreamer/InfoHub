@@ -38,8 +38,8 @@ func (c *HTTPJSONCrawler) String() string {
 }
 
 // Fetch 拉取并解析 HTTP JSON 数据。
-func (c *HTTPJSONCrawler) Fetch() ([]model.NewsItem, error) {
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, c.url, nil)
+func (c *HTTPJSONCrawler) Fetch(ctx context.Context) ([]model.NewsItem, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build http_json request for %s: %w", c.url, err)
 	}

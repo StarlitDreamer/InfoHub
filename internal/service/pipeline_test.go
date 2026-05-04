@@ -189,7 +189,7 @@ type staticServiceCrawler struct {
 	items []model.NewsItem
 }
 
-func (c staticServiceCrawler) Fetch() ([]model.NewsItem, error) {
+func (c staticServiceCrawler) Fetch(ctx context.Context) ([]model.NewsItem, error) {
 	return c.items, nil
 }
 

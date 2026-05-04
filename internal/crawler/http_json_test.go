@@ -1,6 +1,8 @@
 package crawler
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -27,7 +29,7 @@ func TestHTTPJSONCrawlerFetchesItemsFromObjectEnvelope(t *testing.T) {
 	}))
 	defer server.Close()
 
-	items, err := NewHTTPJSONCrawler(server.URL, server.Client(), nil).Fetch()
+	items, err := NewHTTPJSONCrawler(server.URL, server.Client(), nil).Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("fetch failed: %v", err)
 	}
@@ -66,7 +68,7 @@ func TestHTTPJSONCrawlerFetchesItemsFromArrayEnvelope(t *testing.T) {
 	}))
 	defer server.Close()
 
-	items, err := NewHTTPJSONCrawler(server.URL, server.Client(), nil).Fetch()
+	items, err := NewHTTPJSONCrawler(server.URL, server.Client(), nil).Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("fetch failed: %v", err)
 	}
@@ -81,7 +83,7 @@ func TestHTTPJSONCrawlerIncludesSourceURLInStatusErrors(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := NewHTTPJSONCrawler(server.URL, server.Client(), nil).Fetch()
+	_, err := NewHTTPJSONCrawler(server.URL, server.Client(), nil).Fetch(context.Background())
 	if err == nil {
 		t.Fatal("expected fetch to fail")
 	}
@@ -104,8 +106,18 @@ func TestHTTPJSONCrawlerSendsConfiguredHeaders(t *testing.T) {
 
 	_, err := NewHTTPJSONCrawler(server.URL, server.Client(), map[string]string{
 		"X-Token": "secret",
-	}).Fetch()
+	}).Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("fetch failed: %v", err)
+	}
+}
+
+func TestHTTPJSONCrawlerRespectsCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := NewHTTPJSONCrawler("https://example.com/data.json", http.DefaultClient, nil).Fetch(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context canceled, got %v", err)
 	}
 }

@@ -39,7 +39,7 @@ func (p *Pipeline) Run() ([]model.NewsItem, error) {
 
 // RunContext 执行采集、去重和 AI 摘要处理流程。
 func (p *Pipeline) RunContext(ctx context.Context) ([]model.NewsItem, error) {
-	items, err := p.crawler.Fetch()
+	items, err := p.crawler.Fetch(ctx)
 	if err != nil {
 		return nil, err
 	}
