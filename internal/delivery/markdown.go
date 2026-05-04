@@ -44,16 +44,17 @@ func renderMarkdown(items []model.NewsItem, groupBySource bool) string {
 }
 
 func renderOverview(builder *strings.Builder, items []model.NewsItem) {
-	builder.WriteString("## 今日概览\n")
-	builder.WriteString(fmt.Sprintf("- 收录条目：%d\n", len(items)))
-	builder.WriteString(fmt.Sprintf("- 高优先级：%d\n", countHighPriority(items)))
-	builder.WriteString(fmt.Sprintf("- 来源分布：%s\n", summarizeSources(items)))
-	builder.WriteString(fmt.Sprintf("- 重点关注：%s\n", summarizeTopTitles(items, 3)))
+	overview := summary.BuildOverview(items, 3, 3)
 
-	actions := summarizePriorityActions(items, 3)
-	if len(actions) > 0 {
+	builder.WriteString("## 今日概览\n")
+	builder.WriteString(fmt.Sprintf("- 收录条目：%d\n", overview.ItemCount))
+	builder.WriteString(fmt.Sprintf("- 高优先级：%d\n", overview.HighPriorityCount))
+	builder.WriteString(fmt.Sprintf("- 来源分布：%s\n", overview.SourceSummary))
+	builder.WriteString(fmt.Sprintf("- 重点关注：%s\n", joinOrDefault(overview.TopTitles, "；", "暂无")))
+
+	if len(overview.PriorityActions) > 0 {
 		builder.WriteString("- 今日优先动作：\n")
-		for _, action := range actions {
+		for _, action := range overview.PriorityActions {
 			builder.WriteString(fmt.Sprintf("  - %s\n", action))
 		}
 	}
@@ -106,84 +107,6 @@ func renderItem(builder *strings.Builder, item model.NewsItem) {
 	builder.WriteString("\n")
 }
 
-func summarizePriorityActions(items []model.NewsItem, limit int) []string {
-	if limit <= 0 {
-		limit = 1
-	}
-
-	actions := make([]string, 0, limit)
-	seen := make(map[string]struct{})
-	for _, item := range items {
-		action := summary.RecommendAction(item, summary.Parse(item)).Description
-		if _, ok := seen[action]; ok {
-			continue
-		}
-		seen[action] = struct{}{}
-		actions = append(actions, action)
-		if len(actions) == limit {
-			break
-		}
-	}
-
-	return actions
-}
-
-func countHighPriority(items []model.NewsItem) int {
-	count := 0
-	for _, item := range items {
-		if clampScore(item.Score) >= 4 {
-			count++
-		}
-	}
-
-	return count
-}
-
-func summarizeSources(items []model.NewsItem) string {
-	counts := map[string]int{}
-	order := make([]string, 0)
-
-	for _, item := range items {
-		source := normalizeSource(item.Source)
-		if _, ok := counts[source]; !ok {
-			order = append(order, source)
-		}
-		counts[source]++
-	}
-
-	sort.Strings(order)
-	parts := make([]string, 0, len(order))
-	for _, source := range order {
-		parts = append(parts, fmt.Sprintf("%s %d", source, counts[source]))
-	}
-
-	return strings.Join(parts, "；")
-}
-
-func summarizeTopTitles(items []model.NewsItem, limit int) string {
-	if limit <= 0 {
-		limit = 1
-	}
-
-	parts := make([]string, 0, limit)
-	for _, item := range items {
-		title := strings.TrimSpace(item.Title)
-		if title == "" {
-			continue
-		}
-		parts = append(parts, title)
-		if len(parts) == limit {
-			break
-		}
-	}
-
-	if len(parts) == 0 {
-		return "暂无"
-	}
-
-	return strings.Join(parts, "；")
-}
-
 func normalizeSource(source string) string {
 	source = strings.TrimSpace(source)
 	if source == "" {
@@ -191,6 +114,13 @@ func normalizeSource(source string) string {
 	}
 
 	return source
+}
+
+func joinOrDefault(values []string, sep, fallback string) string {
+	if len(values) == 0 {
+		return fallback
+	}
+	return strings.Join(values, sep)
 }
 
 // scoreStars 将 1-5 分评分转换为星级展示。

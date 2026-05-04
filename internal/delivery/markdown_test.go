@@ -103,21 +103,6 @@ func TestRenderMarkdownOverviewSummarizesSourcesAndTopItems(t *testing.T) {
 	}
 }
 
-func TestSummarizePriorityActionsDeduplicates(t *testing.T) {
-	actions := summarizePriorityActions([]model.NewsItem{
-		{Title: "alpha", Score: 5},
-		{Title: "beta", Score: 5},
-		{Title: "gamma", Score: 3, Tags: []string{"AI"}},
-	}, 3)
-
-	if len(actions) != 2 {
-		t.Fatalf("expected deduplicated actions, got %+v", actions)
-	}
-	if !strings.Contains(actions[0], "优先安排评审") {
-		t.Fatalf("expected highest priority action first, got %+v", actions)
-	}
-}
-
 func TestRecommendActionUsesScoreAndTopicSignals(t *testing.T) {
 	high := summary.RecommendAction(model.NewsItem{Score: 5}, summary.Structured{})
 	if !strings.Contains(high.Description, "优先安排评审") {
