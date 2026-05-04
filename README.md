@@ -121,6 +121,9 @@ Common environment variables:
 - `INFOHUB_PREFERENCE_TAGS`
 - `INFOHUB_PREFERENCE_SOURCES`
 - `INFOHUB_PREFERENCE_KEYWORDS`
+- `INFOHUB_PREFERENCE_TAG_WEIGHT`
+- `INFOHUB_PREFERENCE_SOURCE_WEIGHT`
+- `INFOHUB_PREFERENCE_KEYWORD_WEIGHT`
 - `INFOHUB_SEND_EMPTY_REPORT`
 - `INFOHUB_STORAGE_DIR`
 - `INFOHUB_DEDUP_STORE_PATH`
@@ -165,7 +168,7 @@ Source config can also use an explicit `sources` array in JSON:
 
 Set `report.group_by_source` to `true` if you want the generated Markdown report to be grouped by item source.
 
-Set personalization preferences if you want decision scoring to favor selected tags, sources, and keywords.
+Set personalization preferences if you want decision scoring to favor selected tags, sources, and keywords. You can also tune the relative impact of tag, source, and keyword matches through preference weight settings.
 
 ## HTTP API
 

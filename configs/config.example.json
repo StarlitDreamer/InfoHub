@@ -37,7 +37,12 @@
     "keywords": [
       "agent",
       "workflow"
-    ]
+    ],
+    "weights": {
+      "tag": 1.2,
+      "source": 1.0,
+      "keyword": 0.6
+    }
   },
   "storage": {
     "dir": "data/reports"

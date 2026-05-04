@@ -180,6 +180,11 @@ func buildAgentRequest(cfg config.Config, trigger string) service.AgentRequest {
 				Tags:     append([]string(nil), cfg.PreferenceTags...),
 				Sources:  append([]string(nil), cfg.PreferenceSources...),
 				Keywords: append([]string(nil), cfg.PreferenceKeywords...),
+				Weights: service.PreferenceWeights{
+					TagMatch:     cfg.PreferenceTagWeight,
+					SourceMatch:  cfg.PreferenceSourceWeight,
+					KeywordMatch: cfg.PreferenceKeywordWeight,
+				},
 			},
 		},
 	}

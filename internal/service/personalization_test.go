@@ -45,6 +45,11 @@ func TestSortByPreferenceScoreBoostsPreferredTagsAndSources(t *testing.T) {
 		Tags:     []string{"AI", "Agent"},
 		Sources:  []string{"ai-feed"},
 		Keywords: []string{"编排"},
+		Weights: PreferenceWeights{
+			TagMatch:     1.5,
+			SourceMatch:  1.2,
+			KeywordMatch: 0.7,
+		},
 	}, now)
 
 	if len(result) != 2 || result[0].Title != "AI Agent 框架发布" {
@@ -63,5 +68,41 @@ func TestSortByPreferenceScoreFallsBackWhenPreferenceEmpty(t *testing.T) {
 
 	if len(result) != 2 || result[0].Title != "较新" {
 		t.Fatalf("期望空偏好时回退基础排序，得到：%+v", result)
+	}
+}
+
+func TestSortByPreferenceScoreUsesConfiguredWeights(t *testing.T) {
+	now := time.Date(2026, 5, 4, 12, 0, 0, 0, time.UTC)
+	items := []model.NewsItem{
+		{
+			Title:       "AI 平台动态",
+			Content:     "普通更新",
+			Tags:        []string{"AI"},
+			SourceName:  "neutral-feed",
+			Score:       4.0,
+			PublishTime: now.Add(-1 * time.Hour),
+		},
+		{
+			Title:       "一般技术新闻",
+			Content:     "普通更新",
+			Tags:        []string{"Infra"},
+			SourceName:  "preferred-feed",
+			Score:       4.0,
+			PublishTime: now.Add(-1 * time.Hour),
+		},
+	}
+
+	result := SortByPreferenceScore(items, UserPreference{
+		Tags:    []string{"AI"},
+		Sources: []string{"preferred-feed"},
+		Weights: PreferenceWeights{
+			TagMatch:     0.3,
+			SourceMatch:  1.6,
+			KeywordMatch: 0.6,
+		},
+	}, now)
+
+	if len(result) != 2 || result[0].SourceName != "preferred-feed" {
+		t.Fatalf("期望来源权重更高时优先来源匹配项，得到：%+v", result)
 	}
 }

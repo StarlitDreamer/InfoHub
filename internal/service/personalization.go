@@ -13,6 +13,14 @@ type UserPreference struct {
 	Tags     []string
 	Sources  []string
 	Keywords []string
+	Weights  PreferenceWeights
+}
+
+// PreferenceWeights 定义个性化推荐中不同偏好信号的加权系数。
+type PreferenceWeights struct {
+	TagMatch     float64
+	SourceMatch  float64
+	KeywordMatch float64
 }
 
 // IsZero 判断是否未配置任何个性化偏好。
@@ -72,19 +80,35 @@ func SortByPreferenceScore(items []model.NewsItem, preference UserPreference, no
 }
 
 func preferenceBoost(item model.NewsItem, preference UserPreference) float64 {
+	weights := normalizePreferenceWeights(preference.Weights)
 	boost := 0.0
 
 	tagMatches := countTagMatches(item.Tags, preference.Tags)
-	boost += float64(tagMatches) * 1.2
+	boost += float64(tagMatches) * weights.TagMatch
 
 	if matchesSource(item, preference.Sources) {
-		boost += 1.0
+		boost += weights.SourceMatch
 	}
 
 	keywordMatches := countKeywordMatches(item, preference.Keywords)
-	boost += float64(keywordMatches) * 0.6
+	boost += float64(keywordMatches) * weights.KeywordMatch
 
 	return boost
+}
+
+// normalizePreferenceWeights 为未配置的权重补齐默认值。
+func normalizePreferenceWeights(weights PreferenceWeights) PreferenceWeights {
+	if weights.TagMatch <= 0 {
+		weights.TagMatch = 1.2
+	}
+	if weights.SourceMatch <= 0 {
+		weights.SourceMatch = 1.0
+	}
+	if weights.KeywordMatch <= 0 {
+		weights.KeywordMatch = 0.6
+	}
+
+	return weights
 }
 
 func hasAllowedTag(tags []string, allowed map[string]struct{}) bool {

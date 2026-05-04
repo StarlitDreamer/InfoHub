@@ -27,6 +27,9 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("INFOHUB_PREFERENCE_TAGS", "AI,Agent")
 	t.Setenv("INFOHUB_PREFERENCE_SOURCES", "openai-news,google-blog")
 	t.Setenv("INFOHUB_PREFERENCE_KEYWORDS", "agent,workflow")
+	t.Setenv("INFOHUB_PREFERENCE_TAG_WEIGHT", "1.8")
+	t.Setenv("INFOHUB_PREFERENCE_SOURCE_WEIGHT", "1.1")
+	t.Setenv("INFOHUB_PREFERENCE_KEYWORD_WEIGHT", "0.4")
 	t.Setenv("INFOHUB_SCHEDULE_CRON", "*/15 * * * *")
 	t.Setenv("INFOHUB_SCHEDULE_INTERVAL_SECONDS", "120")
 	t.Setenv("INFOHUB_STORAGE_DIR", "tmp/reports")
@@ -69,6 +72,9 @@ func TestLoadFromEnv(t *testing.T) {
 	}
 	if len(cfg.PreferenceTags) != 2 || cfg.PreferenceTags[0] != "AI" || len(cfg.PreferenceSources) != 2 || len(cfg.PreferenceKeywords) != 2 {
 		t.Fatalf("unexpected preference config: %+v", cfg)
+	}
+	if cfg.PreferenceTagWeight != 1.8 || cfg.PreferenceSourceWeight != 1.1 || cfg.PreferenceKeywordWeight != 0.4 {
+		t.Fatalf("unexpected preference weights: %+v", cfg)
 	}
 	if cfg.ScheduleInterval != 120*time.Second {
 		t.Fatalf("expected 120s schedule interval, got %s", cfg.ScheduleInterval)
@@ -149,7 +155,7 @@ func TestLoadFromJSONFile(t *testing.T) {
   "ai": {"endpoint": "https://api.example.com/v1/chat/completions", "api_key": "file-key", "model": "file-model"},
   "webhook": {"url": "https://example.com/webhook", "send_empty_report": true},
   "email": {"smtp_host": "smtp.example.com", "smtp_port": 2525, "username": "mailer", "password": "secret", "from": "robot@example.com", "to": ["alice@example.com"], "subject": "文件日报"},
-  "preference": {"tags": ["AI"], "sources": ["openai-news"], "keywords": ["agent"]},
+  "preference": {"tags": ["AI"], "sources": ["openai-news"], "keywords": ["agent"], "weights": {"tag": 2.1, "source": 1.4, "keyword": 0.8}},
   "storage": {"dir": "file/reports"},
   "dedup": {"store_path": "file/dedup/seen.json"},
   "http": {"addr": ":7070"},
@@ -191,6 +197,9 @@ func TestLoadFromJSONFile(t *testing.T) {
 	}
 	if len(cfg.PreferenceTags) != 1 || cfg.PreferenceTags[0] != "AI" || len(cfg.PreferenceSources) != 1 || len(cfg.PreferenceKeywords) != 1 {
 		t.Fatalf("unexpected preference config: %+v", cfg)
+	}
+	if cfg.PreferenceTagWeight != 2.1 || cfg.PreferenceSourceWeight != 1.4 || cfg.PreferenceKeywordWeight != 0.8 {
+		t.Fatalf("unexpected preference weights: %+v", cfg)
 	}
 	if cfg.ScheduleInterval != 300*time.Second {
 		t.Fatalf("expected 300s interval, got %s", cfg.ScheduleInterval)

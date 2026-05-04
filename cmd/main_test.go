@@ -225,6 +225,18 @@ func TestBuildAgentRequestCarriesPreference(t *testing.T) {
 	}
 }
 
+func TestBuildAgentRequestCarriesConfiguredPreferenceWeights(t *testing.T) {
+	request := buildAgentRequest(config.Config{
+		PreferenceTagWeight:     2.0,
+		PreferenceSourceWeight:  1.5,
+		PreferenceKeywordWeight: 0.9,
+	}, "manual")
+
+	if request.Context.Preference.Weights.TagMatch != 2.0 || request.Context.Preference.Weights.SourceMatch != 1.5 || request.Context.Preference.Weights.KeywordMatch != 0.9 {
+		t.Fatalf("expected configured preference weights, got %+v", request.Context.Preference.Weights)
+	}
+}
+
 func TestNewCrawlerFallsBackToDemoWhenSourceBuildFails(t *testing.T) {
 	built := newCrawler(config.Config{
 		Sources: []config.SourceConfig{

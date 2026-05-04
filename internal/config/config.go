@@ -18,43 +18,49 @@ const defaultRedisDedupKey = "infohub:dedup:seen"
 const defaultMySQLTable = "reports"
 const defaultSMTPPort = 25
 const defaultEmailSubject = "InfoHub 每日报告"
+const defaultPreferenceTagWeight = 1.2
+const defaultPreferenceSourceWeight = 1.0
+const defaultPreferenceKeywordWeight = 0.6
 
 // Config 保存信息汇总 Agent 的运行配置。
 type Config struct {
-	Sources             []SourceConfig
-	RSSURL              string
-	RSSURLs             []string
-	RSSMaxItems         int
-	RSSRecentWithin     time.Duration
-	ReportMaxItems      int
-	ReportGroupBySource bool
-	AIEndpoint          string
-	AIAPIKey            string
-	AIModel             string
-	WebhookURL          string
-	SMTPHost            string
-	SMTPPort            int
-	SMTPUsername        string
-	SMTPPassword        string
-	EmailFrom           string
-	EmailTo             []string
-	EmailSubject        string
-	PreferenceTags      []string
-	PreferenceSources   []string
-	PreferenceKeywords  []string
-	ScheduleInterval    time.Duration
-	ScheduleCron        string
-	StorageDir          string
-	HTTPAddr            string
-	DedupStorePath      string
-	SendEmptyReport     bool
-	AuthToken           string
-	RedisAddr           string
-	RedisPassword       string
-	RedisDB             int
-	RedisDedupKey       string
-	MySQLDSN            string
-	MySQLTable          string
+	Sources                 []SourceConfig
+	RSSURL                  string
+	RSSURLs                 []string
+	RSSMaxItems             int
+	RSSRecentWithin         time.Duration
+	ReportMaxItems          int
+	ReportGroupBySource     bool
+	AIEndpoint              string
+	AIAPIKey                string
+	AIModel                 string
+	WebhookURL              string
+	SMTPHost                string
+	SMTPPort                int
+	SMTPUsername            string
+	SMTPPassword            string
+	EmailFrom               string
+	EmailTo                 []string
+	EmailSubject            string
+	PreferenceTags          []string
+	PreferenceSources       []string
+	PreferenceKeywords      []string
+	PreferenceTagWeight     float64
+	PreferenceSourceWeight  float64
+	PreferenceKeywordWeight float64
+	ScheduleInterval        time.Duration
+	ScheduleCron            string
+	StorageDir              string
+	HTTPAddr                string
+	DedupStorePath          string
+	SendEmptyReport         bool
+	AuthToken               string
+	RedisAddr               string
+	RedisPassword           string
+	RedisDB                 int
+	RedisDedupKey           string
+	MySQLDSN                string
+	MySQLTable              string
 }
 
 // SourceConfig 定义一个可执行的数据源配置。
@@ -155,14 +161,17 @@ func (c Config) UseMySQL() bool {
 
 func defaultConfig() Config {
 	return Config{
-		ScheduleInterval: defaultScheduleInterval,
-		StorageDir:       defaultStorageDir,
-		HTTPAddr:         defaultHTTPAddr,
-		DedupStorePath:   defaultDedupStorePath,
-		RedisDedupKey:    defaultRedisDedupKey,
-		MySQLTable:       defaultMySQLTable,
-		SMTPPort:         defaultSMTPPort,
-		EmailSubject:     defaultEmailSubject,
+		ScheduleInterval:        defaultScheduleInterval,
+		StorageDir:              defaultStorageDir,
+		HTTPAddr:                defaultHTTPAddr,
+		DedupStorePath:          defaultDedupStorePath,
+		RedisDedupKey:           defaultRedisDedupKey,
+		MySQLTable:              defaultMySQLTable,
+		SMTPPort:                defaultSMTPPort,
+		EmailSubject:            defaultEmailSubject,
+		PreferenceTagWeight:     defaultPreferenceTagWeight,
+		PreferenceSourceWeight:  defaultPreferenceSourceWeight,
+		PreferenceKeywordWeight: defaultPreferenceKeywordWeight,
 	}
 }
 
@@ -245,6 +254,15 @@ func mergeConfig(base, override Config) Config {
 	if len(override.PreferenceKeywords) > 0 {
 		base.PreferenceKeywords = override.PreferenceKeywords
 	}
+	if override.PreferenceTagWeight > 0 {
+		base.PreferenceTagWeight = override.PreferenceTagWeight
+	}
+	if override.PreferenceSourceWeight > 0 {
+		base.PreferenceSourceWeight = override.PreferenceSourceWeight
+	}
+	if override.PreferenceKeywordWeight > 0 {
+		base.PreferenceKeywordWeight = override.PreferenceKeywordWeight
+	}
 	if override.ScheduleCron != "" {
 		base.ScheduleCron = override.ScheduleCron
 	}
@@ -311,6 +329,9 @@ func applyEnv(cfg Config) Config {
 	cfg.PreferenceTags = readList("INFOHUB_PREFERENCE_TAGS", strings.Join(cfg.PreferenceTags, ","))
 	cfg.PreferenceSources = readList("INFOHUB_PREFERENCE_SOURCES", strings.Join(cfg.PreferenceSources, ","))
 	cfg.PreferenceKeywords = readList("INFOHUB_PREFERENCE_KEYWORDS", strings.Join(cfg.PreferenceKeywords, ","))
+	cfg.PreferenceTagWeight = readFloat("INFOHUB_PREFERENCE_TAG_WEIGHT", cfg.PreferenceTagWeight)
+	cfg.PreferenceSourceWeight = readFloat("INFOHUB_PREFERENCE_SOURCE_WEIGHT", cfg.PreferenceSourceWeight)
+	cfg.PreferenceKeywordWeight = readFloat("INFOHUB_PREFERENCE_KEYWORD_WEIGHT", cfg.PreferenceKeywordWeight)
 	cfg.ScheduleCron = readString("INFOHUB_SCHEDULE_CRON", cfg.ScheduleCron)
 	cfg.ScheduleInterval = readDuration("INFOHUB_SCHEDULE_INTERVAL_SECONDS", cfg.ScheduleInterval)
 	cfg.StorageDir = readString("INFOHUB_STORAGE_DIR", cfg.StorageDir)
@@ -362,6 +383,11 @@ type fileConfig struct {
 		Tags     []string `json:"tags"`
 		Sources  []string `json:"sources"`
 		Keywords []string `json:"keywords"`
+		Weights  struct {
+			Tag     float64 `json:"tag"`
+			Source  float64 `json:"source"`
+			Keyword float64 `json:"keyword"`
+		} `json:"weights"`
 	} `json:"preference"`
 	Storage struct {
 		Dir string `json:"dir"`
@@ -404,38 +430,41 @@ type sourceFileConfig struct {
 
 func (f fileConfig) toConfig() Config {
 	cfg := Config{
-		Sources:             make([]SourceConfig, 0, len(f.Sources)),
-		RSSURL:              f.RSS.URL,
-		RSSURLs:             f.RSS.URLs,
-		RSSMaxItems:         f.RSS.MaxItemsPerFeed,
-		AIEndpoint:          f.AI.Endpoint,
-		AIAPIKey:            f.AI.APIKey,
-		AIModel:             f.AI.Model,
-		WebhookURL:          f.Webhook.URL,
-		SMTPHost:            f.Email.SMTPHost,
-		SMTPPort:            firstPositive(f.Email.SMTPPort, defaultSMTPPort),
-		SMTPUsername:        f.Email.Username,
-		SMTPPassword:        f.Email.Password,
-		EmailFrom:           f.Email.From,
-		EmailTo:             append([]string(nil), f.Email.To...),
-		EmailSubject:        firstNonEmpty(f.Email.Subject, defaultEmailSubject),
-		PreferenceTags:      append([]string(nil), f.Preference.Tags...),
-		PreferenceSources:   append([]string(nil), f.Preference.Sources...),
-		PreferenceKeywords:  append([]string(nil), f.Preference.Keywords...),
-		SendEmptyReport:     f.Webhook.SendEmptyReport,
-		ScheduleCron:        f.Scheduler.Cron,
-		StorageDir:          f.Storage.Dir,
-		HTTPAddr:            f.HTTP.Addr,
-		DedupStorePath:      f.Dedup.StorePath,
-		AuthToken:           f.Auth.Token,
-		RedisAddr:           f.Redis.Addr,
-		RedisPassword:       f.Redis.Password,
-		RedisDB:             f.Redis.DB,
-		RedisDedupKey:       f.Redis.DedupKey,
-		MySQLDSN:            f.MySQL.DSN,
-		MySQLTable:          firstNonEmpty(f.MySQL.Table, defaultMySQLTable),
-		ReportMaxItems:      f.Report.MaxItems,
-		ReportGroupBySource: f.Report.GroupBySource,
+		Sources:                 make([]SourceConfig, 0, len(f.Sources)),
+		RSSURL:                  f.RSS.URL,
+		RSSURLs:                 f.RSS.URLs,
+		RSSMaxItems:             f.RSS.MaxItemsPerFeed,
+		AIEndpoint:              f.AI.Endpoint,
+		AIAPIKey:                f.AI.APIKey,
+		AIModel:                 f.AI.Model,
+		WebhookURL:              f.Webhook.URL,
+		SMTPHost:                f.Email.SMTPHost,
+		SMTPPort:                firstPositive(f.Email.SMTPPort, defaultSMTPPort),
+		SMTPUsername:            f.Email.Username,
+		SMTPPassword:            f.Email.Password,
+		EmailFrom:               f.Email.From,
+		EmailTo:                 append([]string(nil), f.Email.To...),
+		EmailSubject:            firstNonEmpty(f.Email.Subject, defaultEmailSubject),
+		PreferenceTags:          append([]string(nil), f.Preference.Tags...),
+		PreferenceSources:       append([]string(nil), f.Preference.Sources...),
+		PreferenceKeywords:      append([]string(nil), f.Preference.Keywords...),
+		PreferenceTagWeight:     firstPositiveFloat(f.Preference.Weights.Tag, defaultPreferenceTagWeight),
+		PreferenceSourceWeight:  firstPositiveFloat(f.Preference.Weights.Source, defaultPreferenceSourceWeight),
+		PreferenceKeywordWeight: firstPositiveFloat(f.Preference.Weights.Keyword, defaultPreferenceKeywordWeight),
+		SendEmptyReport:         f.Webhook.SendEmptyReport,
+		ScheduleCron:            f.Scheduler.Cron,
+		StorageDir:              f.Storage.Dir,
+		HTTPAddr:                f.HTTP.Addr,
+		DedupStorePath:          f.Dedup.StorePath,
+		AuthToken:               f.Auth.Token,
+		RedisAddr:               f.Redis.Addr,
+		RedisPassword:           f.Redis.Password,
+		RedisDB:                 f.Redis.DB,
+		RedisDedupKey:           f.Redis.DedupKey,
+		MySQLDSN:                f.MySQL.DSN,
+		MySQLTable:              firstNonEmpty(f.MySQL.Table, defaultMySQLTable),
+		ReportMaxItems:          f.Report.MaxItems,
+		ReportGroupBySource:     f.Report.GroupBySource,
 	}
 	for _, source := range f.Sources {
 		enabled := true
@@ -523,6 +552,20 @@ func readInt(name string, fallback int) int {
 	return parsed
 }
 
+func readFloat(name string, fallback float64) float64 {
+	value := os.Getenv(name)
+	if value == "" {
+		return fallback
+	}
+
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+
+	return parsed
+}
+
 func readList(name, fallback string) []string {
 	values := splitList(os.Getenv(name))
 	if len(values) > 0 {
@@ -566,6 +609,16 @@ func firstNonEmpty(values ...string) string {
 }
 
 func firstPositive(values ...int) int {
+	for _, value := range values {
+		if value > 0 {
+			return value
+		}
+	}
+
+	return 0
+}
+
+func firstPositiveFloat(values ...float64) float64 {
 	for _, value := range values {
 		if value > 0 {
 			return value
