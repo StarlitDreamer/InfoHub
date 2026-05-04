@@ -192,6 +192,44 @@ func TestAgentRunAppliesSourcePriorityAndReportFilter(t *testing.T) {
 	}
 }
 
+func TestAgentRunBalancesDisplayedItemsAcrossSources(t *testing.T) {
+	fixedNow := time.Date(2026, 5, 3, 20, 0, 0, 0, time.UTC)
+	repo := &agentRepositoryStub{}
+	agent := NewAgent(
+		staticPipelineRunner{
+			items: []model.NewsItem{
+				{SourceName: "google", Title: "google-1", Content: "summary", Score: 5, PublishTime: fixedNow.Add(-1 * time.Hour)},
+				{SourceName: "google", Title: "google-2", Content: "summary", Score: 4.8, PublishTime: fixedNow.Add(-2 * time.Hour)},
+				{SourceName: "google", Title: "google-3", Content: "summary", Score: 4.6, PublishTime: fixedNow.Add(-3 * time.Hour)},
+				{SourceName: "openai", Title: "openai-1", Content: "summary", Score: 3.5, PublishTime: fixedNow.Add(-90 * time.Minute)},
+			},
+		},
+		repo,
+		AgentOptions{
+			ReportMaxItems: 3,
+			Now:            func() time.Time { return fixedNow },
+		},
+	)
+
+	result, err := agent.Run(context.Background())
+	if err != nil {
+		t.Fatalf("agent run failed: %v", err)
+	}
+
+	if result.DisplayCount != 3 {
+		t.Fatalf("expected display count 3, got %d", result.DisplayCount)
+	}
+	if !strings.Contains(result.Markdown, "google-1") || !strings.Contains(result.Markdown, "openai-1") {
+		t.Fatalf("expected balanced markdown to include both sources, got %s", result.Markdown)
+	}
+	if !strings.Contains(result.Markdown, "google-2") {
+		t.Fatalf("expected balanced markdown to include second google item, got %s", result.Markdown)
+	}
+	if strings.Contains(result.Markdown, "google-3") {
+		t.Fatalf("expected markdown to stop before third google item, got %s", result.Markdown)
+	}
+}
+
 func TestAgentRunAppliesPreferenceBoostBeforeSourcePriority(t *testing.T) {
 	fixedNow := time.Date(2026, 5, 3, 20, 0, 0, 0, time.UTC)
 	repo := &agentRepositoryStub{}

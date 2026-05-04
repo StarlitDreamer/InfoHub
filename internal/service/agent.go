@@ -104,7 +104,7 @@ func (a *Agent) RunWithRequest(ctx context.Context, request AgentRequest) (Resul
 
 	sortedItems := SortByPreferenceScore(items, request.Context.Preference, a.now())
 	sortedItems = applySourcePriority(sortedItems, request)
-	displayItems := LimitItems(filterReportItems(sortedItems, request), a.reportMaxItems)
+	displayItems := LimitItemsBalancedBySource(filterReportItems(sortedItems, request), a.reportMaxItems)
 
 	report := delivery.RenderMarkdown(displayItems)
 	if a.groupBySource {

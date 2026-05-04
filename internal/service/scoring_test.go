@@ -39,6 +39,42 @@ func TestLimitItems(t *testing.T) {
 	}
 }
 
+func TestLimitItemsBalancedBySourceAlternatesSourcesWhenPossible(t *testing.T) {
+	items := []model.NewsItem{
+		{Source: "google", Title: "g1"},
+		{Source: "google", Title: "g2"},
+		{Source: "google", Title: "g3"},
+		{Source: "openai", Title: "o1"},
+		{Source: "openai", Title: "o2"},
+	}
+
+	limited := LimitItemsBalancedBySource(items, 4)
+
+	if len(limited) != 4 {
+		t.Fatalf("expected 4 items, got %d", len(limited))
+	}
+	expected := []string{"g1", "o1", "g2", "o2"}
+	for index, title := range expected {
+		if limited[index].Title != title {
+			t.Fatalf("expected %s at %d, got %+v", title, index, limited)
+		}
+	}
+}
+
+func TestLimitItemsBalancedBySourceFallsBackToOriginalOrderForSingleSource(t *testing.T) {
+	items := []model.NewsItem{
+		{Source: "google", Title: "g1"},
+		{Source: "google", Title: "g2"},
+		{Source: "google", Title: "g3"},
+	}
+
+	limited := LimitItemsBalancedBySource(items, 2)
+
+	if len(limited) != 2 || limited[0].Title != "g1" || limited[1].Title != "g2" {
+		t.Fatalf("expected original order for single source, got %+v", limited)
+	}
+}
+
 func TestSortByDecisionScoreUsesStableTieBreakers(t *testing.T) {
 	now := time.Date(2026, 5, 3, 12, 0, 0, 0, time.UTC)
 	items := []model.NewsItem{
