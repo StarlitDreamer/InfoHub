@@ -75,3 +75,34 @@ func TestFileReportRepositoryLatestAndList(t *testing.T) {
 		t.Fatalf("expected latest markdown to match second record, got %s", latest.Markdown)
 	}
 }
+
+func TestFileReportRepositoryGet(t *testing.T) {
+	root := t.TempDir()
+	repo := NewFileReportRepository(root)
+	record := ReportRecord{
+		GeneratedAt: time.Date(2026, 5, 3, 16, 30, 0, 0, time.UTC),
+		Markdown:    "# report\n\n## item\nbody\n",
+		Items:       []model.NewsItem{{Title: "second"}},
+	}
+
+	if err := repo.Save(context.Background(), record); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	got, err := repo.Get(context.Background(), "20260503-163000")
+	if err != nil {
+		t.Fatalf("get failed: %v", err)
+	}
+	if got.Markdown != record.Markdown || len(got.Items) != 1 || got.Items[0].Title != "second" {
+		t.Fatalf("unexpected report: %+v", got)
+	}
+}
+
+func TestFileReportRepositoryGetReturnsNotFound(t *testing.T) {
+	repo := NewFileReportRepository(t.TempDir())
+
+	_, err := repo.Get(context.Background(), "20260503-163000")
+	if err != ErrReportNotFound {
+		t.Fatalf("expected ErrReportNotFound, got %v", err)
+	}
+}

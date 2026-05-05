@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"InfoHub-agent/internal/model"
@@ -69,6 +70,46 @@ func (r *MySQLReportRepository) Latest(ctx context.Context) (ReportRecord, error
 		itemsJSON   string
 	)
 	if err := r.db.QueryRowContext(ctx, query).Scan(&generatedAt, &markdown, &itemsJSON); err != nil {
+		if err == sql.ErrNoRows {
+			return ReportRecord{}, ErrReportNotFound
+		}
+
+		return ReportRecord{}, err
+	}
+
+	items, err := decodeItemsJSON(itemsJSON)
+	if err != nil {
+		return ReportRecord{}, err
+	}
+
+	return ReportRecord{
+		GeneratedAt: generatedAt,
+		Markdown:    markdown,
+		Items:       items,
+	}, nil
+}
+
+// Get 按名称读取指定日报详情。
+func (r *MySQLReportRepository) Get(ctx context.Context, name string) (ReportRecord, error) {
+	if err := ctx.Err(); err != nil {
+		return ReportRecord{}, err
+	}
+
+	generatedAt, err := time.Parse("20060102-150405", strings.TrimSpace(name))
+	if err != nil {
+		return ReportRecord{}, ErrReportNotFound
+	}
+
+	query := fmt.Sprintf(
+		"SELECT generated_at, markdown, items_json FROM `%s` WHERE generated_at = ? ORDER BY id DESC LIMIT 1",
+		r.table,
+	)
+
+	var (
+		markdown  string
+		itemsJSON string
+	)
+	if err := r.db.QueryRowContext(ctx, query, generatedAt.UTC()).Scan(&generatedAt, &markdown, &itemsJSON); err != nil {
 		if err == sql.ErrNoRows {
 			return ReportRecord{}, ErrReportNotFound
 		}

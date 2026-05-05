@@ -390,6 +390,10 @@ func (r *agentRepositoryStub) Latest(ctx context.Context) (repository.ReportReco
 	return repository.ReportRecord{}, repository.ErrReportNotFound
 }
 
+func (r *agentRepositoryStub) Get(ctx context.Context, name string) (repository.ReportRecord, error) {
+	return repository.ReportRecord{}, repository.ErrReportNotFound
+}
+
 func (r *agentRepositoryStub) List(ctx context.Context) ([]repository.ReportMetadata, error) {
 	return nil, nil
 }

@@ -115,6 +115,70 @@ func TestMySQLReportRepositoryLatestAndList(t *testing.T) {
 	}
 }
 
+func TestMySQLReportRepositoryGet(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock new failed: %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS `reports`")).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	repo, err := NewMySQLReportRepository(db, "reports")
+	if err != nil {
+		t.Fatalf("create repository failed: %v", err)
+	}
+
+	reportTime := time.Date(2026, 5, 3, 16, 30, 0, 0, time.UTC)
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT generated_at, markdown, items_json FROM `reports` WHERE generated_at = ? ORDER BY id DESC LIMIT 1")).
+		WithArgs(reportTime).
+		WillReturnRows(sqlmock.NewRows([]string{"generated_at", "markdown", "items_json"}).
+			AddRow(reportTime, "# report\n\n## item\n- summary\n", `[{"ID":0,"SourceName":"","Title":"second","Content":"","Source":"","URL":"","PublishTime":"0001-01-01T00:00:00Z","Tags":null,"Score":0}]`))
+
+	record, err := repo.Get(context.Background(), "20260503-163000")
+	if err != nil {
+		t.Fatalf("get failed: %v", err)
+	}
+	if record.Markdown == "" || len(record.Items) != 1 || record.Items[0].Title != "second" {
+		t.Fatalf("unexpected report: %+v", record)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet sql expectations: %v", err)
+	}
+}
+
+func TestMySQLReportRepositoryGetReturnsNotFound(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock new failed: %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS `reports`")).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	repo, err := NewMySQLReportRepository(db, "reports")
+	if err != nil {
+		t.Fatalf("create repository failed: %v", err)
+	}
+
+	reportTime := time.Date(2026, 5, 3, 16, 30, 0, 0, time.UTC)
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT generated_at, markdown, items_json FROM `reports` WHERE generated_at = ? ORDER BY id DESC LIMIT 1")).
+		WithArgs(reportTime).
+		WillReturnRows(sqlmock.NewRows([]string{"generated_at", "markdown", "items_json"}))
+
+	_, err = repo.Get(context.Background(), "20260503-163000")
+	if err != ErrReportNotFound {
+		t.Fatalf("expected ErrReportNotFound, got %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet sql expectations: %v", err)
+	}
+}
+
 func TestMySQLReportRepositoryLatestReturnsNotFound(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

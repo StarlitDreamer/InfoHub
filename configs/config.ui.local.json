@@ -1,0 +1,49 @@
+{
+  "rss": {
+    "url": "",
+    "urls": [
+      "https://blog.google/rss/",
+      "https://openai.com/news/rss.xml"
+    ],
+    "max_items_per_feed": 15,
+    "recent_within_hours": 168
+  },
+  "report": {
+    "max_items": 12
+  },
+  "ai": {
+    "endpoint": "",
+    "api_key": "",
+    "model": ""
+  },
+  "webhook": {
+    "url": "",
+    "send_empty_report": false
+  },
+  "storage": {
+    "dir": "data/reports"
+  },
+  "dedup": {
+    "store_path": "data/dedup/seen.json"
+  },
+  "http": {
+    "addr": ":8080"
+  },
+  "auth": {
+    "token": ""
+  },
+  "redis": {
+    "addr": "",
+    "password": "",
+    "db": 0,
+    "dedup_key": "infohub:dedup:seen"
+  },
+  "mysql": {
+    "dsn": "",
+    "table": "reports",
+    "preference_table": "user_preferences"
+  },
+  "scheduler": {
+    "interval_seconds": 3600
+  }
+}

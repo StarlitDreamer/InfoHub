@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InfoHub 工作台</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <p class="eyebrow">InfoHub Agent</p>
+        <h1>信息日报工作台</h1>
+      </div>
+      <div class="toolbar">
+        <label class="field token-field">
+          <span>访问 Token</span>
+          <input id="tokenInput" type="password" placeholder="未配置可留空" autocomplete="off">
+        </label>
+        <button id="runReportButton" class="primary-button" type="button">生成日报</button>
+      </div>
+    </header>
+
+    <section class="status-panel">
+      <div>
+        <p class="section-label">请求状态</p>
+        <p id="statusMessage" class="status-message">正在加载最新日报...</p>
+      </div>
+      <button id="refreshButton" class="secondary-button" type="button">刷新数据</button>
+    </section>
+
+    <main class="content-grid">
+      <aside class="sidebar">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="section-label">历史日报</p>
+              <h2>历史记录</h2>
+            </div>
+          </div>
+          <div id="historyList" class="history-list empty-state">暂无历史日报</div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="section-label">偏好设置</p>
+              <h2>当前用户</h2>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <label class="field">
+              <span>用户 ID</span>
+              <input id="userIdInput" type="text" placeholder="例如 alice">
+            </label>
+            <label class="field">
+              <span>关注标签</span>
+              <textarea id="tagsInput" rows="2" placeholder="用逗号分隔"></textarea>
+            </label>
+            <label class="field">
+              <span>关注来源</span>
+              <textarea id="sourcesInput" rows="2" placeholder="用逗号分隔"></textarea>
+            </label>
+            <label class="field">
+              <span>关键词</span>
+              <textarea id="keywordsInput" rows="2" placeholder="用逗号分隔"></textarea>
+            </label>
+          </div>
+
+          <div class="weight-grid">
+            <label class="field">
+              <span>标签权重</span>
+              <input id="weightTagInput" type="number" step="0.1" min="0">
+            </label>
+            <label class="field">
+              <span>来源权重</span>
+              <input id="weightSourceInput" type="number" step="0.1" min="0">
+            </label>
+            <label class="field">
+              <span>关键词权重</span>
+              <input id="weightKeywordInput" type="number" step="0.1" min="0">
+            </label>
+          </div>
+
+          <div class="button-row">
+            <button id="loadPreferenceButton" class="secondary-button" type="button">读取偏好</button>
+            <button id="savePreferenceButton" class="primary-button" type="button">保存偏好</button>
+          </div>
+        </section>
+      </aside>
+
+      <section class="main-column">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="section-label">概览</p>
+              <h2>最新日报</h2>
+            </div>
+            <p id="generatedAtLabel" class="generated-at">尚未生成</p>
+          </div>
+          <div class="metric-grid">
+            <article class="metric-card">
+              <span>采集条目</span>
+              <strong id="itemCountValue">-</strong>
+            </article>
+            <article class="metric-card">
+              <span>展示条目</span>
+              <strong id="displayCountValue">-</strong>
+            </article>
+            <article class="metric-card">
+              <span>高优先级</span>
+              <strong id="priorityCountValue">-</strong>
+            </article>
+          </div>
+          <div>
+            <p class="section-label">重点标题</p>
+            <ul id="topTitlesList" class="top-title-list">
+              <li>暂无数据</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="section-label">决策摘要</p>
+              <h2>建议动作</h2>
+            </div>
+          </div>
+          <div id="decisionList" class="decision-list empty-state">暂无决策摘要</div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="section-label">日报正文</p>
+              <h2>Markdown 原文</h2>
+            </div>
+          </div>
+          <pre id="reportMarkdown" class="report-markdown">暂无日报，请先生成或选择历史记录。</pre>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="/assets/app.js"></script>
+</body>
+</html>

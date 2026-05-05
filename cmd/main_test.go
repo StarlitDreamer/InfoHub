@@ -404,6 +404,10 @@ func (r *captureReportRepository) Latest(ctx context.Context) (repository.Report
 	return repository.ReportRecord{}, repository.ErrReportNotFound
 }
 
+func (r *captureReportRepository) Get(ctx context.Context, name string) (repository.ReportRecord, error) {
+	return repository.ReportRecord{}, repository.ErrReportNotFound
+}
+
 func (r *captureReportRepository) List(ctx context.Context) ([]repository.ReportMetadata, error) {
 	return nil, nil
 }

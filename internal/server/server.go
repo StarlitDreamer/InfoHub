@@ -3,7 +3,9 @@ package server
 
 import (
 	"context"
+	"embed"
 	"errors"
+	"io/fs"
 	"net/http"
 	"strings"
 	"time"
@@ -15,6 +17,9 @@ import (
 	"InfoHub-agent/internal/service"
 	"InfoHub-agent/internal/summary"
 )
+
+//go:embed ui/*
+var uiFiles embed.FS
 
 // ReportRunner 表示可被 HTTP 触发的日报生成任务。
 type ReportRunner func(context.Context, RunReportRequest) (ReportResult, error)
@@ -74,6 +79,21 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Op
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery())
+
+	uiFS, err := fs.Sub(uiFiles, "ui")
+	if err != nil {
+		panic(err)
+	}
+
+	router.StaticFS("/assets", http.FS(uiFS))
+	router.GET("/", func(ctx *gin.Context) {
+		content, err := fs.ReadFile(uiFS, "index.html")
+		if err != nil {
+			ctx.String(http.StatusInternalServerError, "failed to load ui")
+			return
+		}
+		ctx.Data(http.StatusOK, "text/html; charset=utf-8", content)
+	})
 
 	router.GET("/health", func(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
@@ -177,16 +197,22 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Op
 			return
 		}
 
-		overview := buildReportOverview(record.Markdown, record.Items, 3)
-		ctx.JSON(http.StatusOK, gin.H{
-			"generated_at":        record.GeneratedAt,
-			"markdown":            record.Markdown,
-			"items":               record.Items,
-			"display_count":       overview.DisplayCount,
-			"high_priority_count": overview.HighPriorityCount,
-			"decision_summary":    overview.DecisionSummary,
-			"top_priority_items":  overview.TopPriorityItems,
-		})
+		respondReport(ctx, record)
+	})
+
+	protected.GET("/reports/:name", func(ctx *gin.Context) {
+		record, err := repo.Get(ctx.Request.Context(), ctx.Param("name"))
+		if err != nil {
+			if errors.Is(err, repository.ErrReportNotFound) {
+				ctx.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
+				return
+			}
+
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		respondReport(ctx, record)
 	})
 
 	protected.GET("/reports", func(ctx *gin.Context) {
@@ -200,6 +226,19 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Op
 	})
 
 	return router
+}
+
+func respondReport(ctx *gin.Context, record repository.ReportRecord) {
+	overview := buildReportOverview(record.Markdown, record.Items, 3)
+	ctx.JSON(http.StatusOK, gin.H{
+		"generated_at":        record.GeneratedAt,
+		"markdown":            record.Markdown,
+		"items":               record.Items,
+		"display_count":       overview.DisplayCount,
+		"high_priority_count": overview.HighPriorityCount,
+		"decision_summary":    overview.DecisionSummary,
+		"top_priority_items":  overview.TopPriorityItems,
+	})
 }
 
 func authMiddleware(token string) gin.HandlerFunc {

@@ -28,6 +28,24 @@ func TestHealth(t *testing.T) {
 	}
 }
 
+func TestIndexPage(t *testing.T) {
+	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
+		return ReportResult{}, nil
+	}, Options{})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, "InfoHub Agent") || !strings.Contains(body, "信息日报工作台") {
+		t.Fatalf("expected index page content, got %s", body)
+	}
+}
+
 func TestRunReport(t *testing.T) {
 	called := false
 	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
@@ -196,6 +214,46 @@ func TestLatestReportReturnsNotFoundWhenRepositoryIsEmpty(t *testing.T) {
 	}
 }
 
+func TestGetReportByName(t *testing.T) {
+	repo := newMemoryRepository()
+	record := repository.ReportRecord{
+		GeneratedAt: time.Date(2026, 5, 3, 16, 0, 0, 0, time.UTC),
+		Markdown:    "# report\n\n## item\nbody\n",
+		Items:       []model.NewsItem{{Title: "item", Score: 4, Content: "summary"}},
+	}
+	_ = repo.Save(context.Background(), record)
+
+	router := NewRouter(repo, func(context.Context, RunReportRequest) (ReportResult, error) {
+		return ReportResult{}, nil
+	}, Options{})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/reports/20260503-160000", nil)
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, `"markdown":"# report\n\n## item\nbody\n"`) {
+		t.Fatalf("expected report markdown in body, got %s", body)
+	}
+}
+
+func TestGetReportByNameReturnsNotFound(t *testing.T) {
+	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
+		return ReportResult{}, nil
+	}, Options{})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/reports/20260503-160000", nil)
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", recorder.Code)
+	}
+}
+
 func TestRunReportReturnsErrorWhenRunnerFails(t *testing.T) {
 	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
 		return ReportResult{}, errors.New("boom")
@@ -331,6 +389,20 @@ func TestHealthSkipsAuth(t *testing.T) {
 	}
 }
 
+func TestIndexSkipsAuth(t *testing.T) {
+	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
+		return ReportResult{}, nil
+	}, Options{AuthToken: "secret"})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected index to skip auth, got %d", recorder.Code)
+	}
+}
+
 func TestPreferenceEndpointsSaveAndRead(t *testing.T) {
 	preferenceRepo := newMemoryPreferenceRepository()
 	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
@@ -392,6 +464,16 @@ func (r *memoryRepository) Latest(ctx context.Context) (repository.ReportRecord,
 	}
 
 	return r.records[len(r.records)-1], nil
+}
+
+func (r *memoryRepository) Get(ctx context.Context, name string) (repository.ReportRecord, error) {
+	for _, record := range r.records {
+		if record.GeneratedAt.Format("20060102-150405") == name {
+			return record, nil
+		}
+	}
+
+	return repository.ReportRecord{}, repository.ErrReportNotFound
 }
 
 func (r *memoryRepository) List(ctx context.Context) ([]repository.ReportMetadata, error) {

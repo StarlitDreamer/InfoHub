@@ -24,6 +24,7 @@ type ReportRecord struct {
 type ReportRepository interface {
 	Save(ctx context.Context, record ReportRecord) error
 	Latest(ctx context.Context) (ReportRecord, error)
+	Get(ctx context.Context, name string) (ReportRecord, error)
 	List(ctx context.Context) ([]ReportMetadata, error)
 }
 

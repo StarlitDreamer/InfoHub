@@ -236,6 +236,14 @@ Health check:
 GET /health
 ```
 
+Open the built-in dashboard:
+
+```http
+GET /
+```
+
+The dashboard is a single-page UI served by Gin. It supports manual report generation, latest report viewing, history browsing, and user preference editing. When auth is enabled, enter the bearer token in the page header and the browser will reuse it for API calls.
+
 Run report generation:
 
 ```http
@@ -281,6 +289,14 @@ GET /reports/latest
 ```
 
 The latest report response includes `display_count`, which reflects how many items are actually rendered in the Markdown report.
+
+Read a historical report by name:
+
+```http
+GET /reports/:name
+```
+
+Use the report name format already returned by `GET /reports`, for example `20260505-090000`.
 
 List historical reports:
 

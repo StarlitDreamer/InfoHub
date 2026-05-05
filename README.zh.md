@@ -236,6 +236,14 @@ go run cmd\main.go run-once
 GET /health
 ```
 
+打开内置工作台：
+
+```http
+GET /
+```
+
+工作台由 Gin 直接提供单页界面，支持手动生成日报、查看最新日报、浏览历史日报，以及编辑用户偏好。开启鉴权后，可在页面顶部输入 Bearer Token，浏览器会自动复用到后续 API 请求中。
+
 执行报告生成：
 
 ```http
@@ -281,6 +289,14 @@ GET /reports/latest
 ```
 
 最新报告响应中包含 `display_count`，表示实际渲染到 Markdown 报告中的条目数量。
+
+按名称读取历史报告详情：
+
+```http
+GET /reports/:name
+```
+
+`:name` 使用 `GET /reports` 返回的报告名称格式，例如 `20260505-090000`。
 
 列出历史报告：
 

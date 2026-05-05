@@ -82,6 +82,41 @@ func (r *FileReportRepository) Latest(ctx context.Context) (ReportRecord, error)
 	}, nil
 }
 
+// Get 按名称读取指定日报详情。
+func (r *FileReportRepository) Get(ctx context.Context, name string) (ReportRecord, error) {
+	if err := ctx.Err(); err != nil {
+		return ReportRecord{}, err
+	}
+
+	createdAt, err := time.Parse("20060102-150405", name)
+	if err != nil {
+		return ReportRecord{}, ErrReportNotFound
+	}
+
+	markdownPath := filepath.Join(r.root, "reports", name+".md")
+	markdown, err := os.ReadFile(markdownPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return ReportRecord{}, ErrReportNotFound
+		}
+		return ReportRecord{}, err
+	}
+
+	items, err := readItems(filepath.Join(r.root, "items", name+".json"))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return ReportRecord{}, ErrReportNotFound
+		}
+		return ReportRecord{}, err
+	}
+
+	return ReportRecord{
+		GeneratedAt: createdAt,
+		Markdown:    string(markdown),
+		Items:       items,
+	}, nil
+}
+
 // List 返回历史日报索引，按生成时间倒序排列。
 func (r *FileReportRepository) List(ctx context.Context) ([]ReportMetadata, error) {
 	if err := ctx.Err(); err != nil {
