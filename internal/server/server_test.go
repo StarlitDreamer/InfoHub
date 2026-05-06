@@ -84,6 +84,46 @@ func TestRunReport(t *testing.T) {
 	}
 }
 
+func TestSearch(t *testing.T) {
+	searchRepo := newMemorySearchRepository()
+	called := false
+	router := NewRouter(newMemoryRepository(), func(context.Context, RunReportRequest) (ReportResult, error) {
+		return ReportResult{}, nil
+	}, Options{
+		SearchRepo: searchRepo,
+		SearchRunner: func(context.Context, SearchRequest) (SearchResult, error) {
+			called = true
+			return SearchResult{
+				Query:             "agent",
+				ItemCount:         2,
+				DisplayCount:      2,
+				GeneratedAt:       time.Date(2026, 5, 6, 8, 0, 0, 0, time.UTC),
+				Warnings:          []string{"reddit: timeout"},
+				HighPriorityCount: 1,
+				TopPriorityItems:  []string{"Agent orchestration"},
+				Items:             []model.NewsItem{{Title: "Agent orchestration", Score: 4}},
+				Markdown:          "# search",
+			}, nil
+		},
+	})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/search", bytes.NewBufferString(`{"query":"agent"}`))
+	request.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+	if !called {
+		t.Fatal("expected search runner to be called")
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, `"query":"agent"`) || !strings.Contains(body, `"warnings":["reddit: timeout"]`) {
+		t.Fatalf("expected search response payload, got %s", body)
+	}
+}
+
 func TestRunReportPassesPreferenceRequest(t *testing.T) {
 	var captured RunReportRequest
 	router := NewRouter(newMemoryRepository(), func(_ context.Context, request RunReportRequest) (ReportResult, error) {
@@ -495,6 +535,50 @@ func (r *memoryRepository) List(ctx context.Context) ([]repository.ReportMetadat
 
 type memoryPreferenceRepository struct {
 	records map[string]repository.UserPreferenceRecord
+}
+
+type memorySearchRepository struct {
+	records []repository.SearchRecord
+}
+
+func newMemorySearchRepository() *memorySearchRepository {
+	return &memorySearchRepository{}
+}
+
+func (r *memorySearchRepository) Save(ctx context.Context, record repository.SearchRecord) error {
+	r.records = append(r.records, record)
+	return nil
+}
+
+func (r *memorySearchRepository) Latest(ctx context.Context) (repository.SearchRecord, error) {
+	if len(r.records) == 0 {
+		return repository.SearchRecord{}, repository.ErrReportNotFound
+	}
+	return r.records[len(r.records)-1], nil
+}
+
+func (r *memorySearchRepository) Get(ctx context.Context, name string) (repository.SearchRecord, error) {
+	for _, record := range r.records {
+		if record.GeneratedAt.Format("20060102-150405") == name {
+			return record, nil
+		}
+	}
+	return repository.SearchRecord{}, repository.ErrReportNotFound
+}
+
+func (r *memorySearchRepository) List(ctx context.Context) ([]repository.SearchMetadata, error) {
+	result := make([]repository.SearchMetadata, 0, len(r.records))
+	for _, record := range r.records {
+		result = append(result, repository.BuildSearchMetadata(
+			record.GeneratedAt.Format("20060102-150405"),
+			record.Query,
+			record.Markdown,
+			record.Items,
+			record.GeneratedAt,
+			2,
+		))
+	}
+	return result, nil
 }
 
 func newMemoryPreferenceRepository() *memoryPreferenceRepository {

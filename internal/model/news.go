@@ -7,6 +7,7 @@ import "time"
 type NewsItem struct {
 	ID          int64
 	SourceName  string
+	Channel     string `json:",omitempty"`
 	Title       string
 	Content     string
 	Source      string
@@ -14,4 +15,6 @@ type NewsItem struct {
 	PublishTime time.Time
 	Tags        []string
 	Score       float64
+	Query       string  `json:",omitempty"`
+	SourceScore float64 `json:",omitempty"`
 }

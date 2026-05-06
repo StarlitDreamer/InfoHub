@@ -115,6 +115,9 @@ func mergeSimilarItem(base, candidate model.NewsItem) model.NewsItem {
 	if result.SourceName == "" {
 		result.SourceName = candidate.SourceName
 	}
+	if result.Channel == "" {
+		result.Channel = candidate.Channel
+	}
 	if result.URL == "" {
 		result.URL = candidate.URL
 	}
@@ -123,6 +126,12 @@ func mergeSimilarItem(base, candidate model.NewsItem) model.NewsItem {
 	}
 	if candidate.Score > result.Score {
 		result.Score = candidate.Score
+	}
+	if candidate.SourceScore > result.SourceScore {
+		result.SourceScore = candidate.SourceScore
+	}
+	if result.Query == "" {
+		result.Query = candidate.Query
 	}
 	result.Tags = mergeTags(result.Tags, candidate.Tags)
 

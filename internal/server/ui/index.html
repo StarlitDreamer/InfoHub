@@ -18,38 +18,26 @@
           <span>访问 Token</span>
           <input id="tokenInput" type="password" placeholder="未配置可留空" autocomplete="off">
         </label>
-        <button id="runReportButton" class="primary-button" type="button">生成日报</button>
+        <button id="refreshButton" class="secondary-button" type="button">刷新数据</button>
       </div>
     </header>
 
     <section class="status-panel">
       <div>
         <p class="section-label">请求状态</p>
-        <p id="statusMessage" class="status-message">正在加载最新日报...</p>
+        <p id="statusMessage" class="status-message">正在加载数据...</p>
       </div>
-      <button id="refreshButton" class="secondary-button" type="button">刷新数据</button>
     </section>
 
-    <main class="content-grid">
+    <main class="layout-grid">
       <aside class="sidebar">
         <section class="panel">
           <div class="panel-header">
             <div>
-              <p class="section-label">历史日报</p>
-              <h2>历史记录</h2>
+              <p class="section-label">用户偏好</p>
+              <h2>个性化设置</h2>
             </div>
           </div>
-          <div id="historyList" class="history-list empty-state">暂无历史日报</div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-header">
-            <div>
-              <p class="section-label">偏好设置</p>
-              <h2>当前用户</h2>
-            </div>
-          </div>
-
           <div class="form-grid">
             <label class="field">
               <span>用户 ID</span>
@@ -64,11 +52,10 @@
               <textarea id="sourcesInput" rows="2" placeholder="用逗号分隔"></textarea>
             </label>
             <label class="field">
-              <span>关键词</span>
+              <span>关键词偏好</span>
               <textarea id="keywordsInput" rows="2" placeholder="用逗号分隔"></textarea>
             </label>
           </div>
-
           <div class="weight-grid">
             <label class="field">
               <span>标签权重</span>
@@ -83,22 +70,41 @@
               <input id="weightKeywordInput" type="number" step="0.1" min="0">
             </label>
           </div>
-
           <div class="button-row">
             <button id="loadPreferenceButton" class="secondary-button" type="button">读取偏好</button>
             <button id="savePreferenceButton" class="primary-button" type="button">保存偏好</button>
           </div>
         </section>
-      </aside>
 
-      <section class="main-column">
         <section class="panel">
           <div class="panel-header">
             <div>
-              <p class="section-label">概览</p>
-              <h2>最新日报</h2>
+              <p class="section-label">日报历史</p>
+              <h2>已生成日报</h2>
             </div>
-            <p id="generatedAtLabel" class="generated-at">尚未生成</p>
+          </div>
+          <div id="historyList" class="history-list empty-state">暂无历史日报</div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="section-label">搜索历史</p>
+              <h2>关键词记录</h2>
+            </div>
+          </div>
+          <div id="searchHistoryList" class="history-list empty-state">暂无搜索记录</div>
+        </section>
+      </aside>
+
+      <section class="content-column">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="section-label">日报执行</p>
+              <h2>生成信息日报</h2>
+            </div>
+            <button id="runReportButton" class="primary-button" type="button">生成日报</button>
           </div>
           <div class="metric-grid">
             <article class="metric-card">
@@ -114,32 +120,77 @@
               <strong id="priorityCountValue">-</strong>
             </article>
           </div>
+          <div class="panel-header panel-header-tight">
+            <div>
+              <p class="section-label">最新日报</p>
+              <h3 id="generatedAtLabel" class="subheading">尚未生成</h3>
+            </div>
+            <button id="copyMarkdownButton" class="secondary-button compact-button" type="button">复制 Markdown</button>
+          </div>
           <div>
             <p class="section-label">重点标题</p>
             <ul id="topTitlesList" class="top-title-list">
               <li>暂无数据</li>
             </ul>
           </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-header">
+          <div class="panel-stack">
             <div>
               <p class="section-label">决策摘要</p>
-              <h2>建议动作</h2>
+              <div id="decisionList" class="decision-list empty-state">暂无决策摘要</div>
+            </div>
+            <div>
+              <p class="section-label">Markdown 原文</p>
+              <pre id="reportMarkdown" class="report-markdown">暂无日报，请先生成或选择历史记录。</pre>
             </div>
           </div>
-          <div id="decisionList" class="decision-list empty-state">暂无决策摘要</div>
         </section>
 
         <section class="panel">
           <div class="panel-header">
             <div>
-              <p class="section-label">日报正文</p>
-              <h2>Markdown 原文</h2>
+              <p class="section-label">关键词搜索</p>
+              <h2>实时搜索与摘要</h2>
             </div>
           </div>
-          <pre id="reportMarkdown" class="report-markdown">暂无日报，请先生成或选择历史记录。</pre>
+          <div class="search-toolbar">
+            <label class="field search-field">
+              <span>搜索关键词</span>
+              <input id="searchQueryInput" type="text" placeholder="例如 agent">
+            </label>
+            <button id="runSearchButton" class="primary-button" type="button">开始搜索</button>
+            <button id="copySearchMarkdownButton" class="secondary-button compact-button" type="button">复制 Markdown</button>
+          </div>
+          <div class="metric-grid">
+            <article class="metric-card">
+              <span>结果总数</span>
+              <strong id="searchItemCountValue">-</strong>
+            </article>
+            <article class="metric-card">
+              <span>展示数量</span>
+              <strong id="searchDisplayCountValue">-</strong>
+            </article>
+            <article class="metric-card">
+              <span>高优先级</span>
+              <strong id="searchPriorityCountValue">-</strong>
+            </article>
+          </div>
+          <div class="panel-header panel-header-tight">
+            <div>
+              <p class="section-label">最近搜索</p>
+              <h3 id="searchGeneratedAtLabel" class="subheading">尚未搜索</h3>
+            </div>
+            <p id="searchQueryLabel" class="generated-at">关键词：-</p>
+          </div>
+          <div class="panel-stack">
+            <div>
+              <p class="section-label">搜索摘要</p>
+              <div id="searchDecisionList" class="decision-list empty-state">暂无搜索结果</div>
+            </div>
+            <div>
+              <p class="section-label">搜索 Markdown</p>
+              <pre id="searchMarkdown" class="report-markdown">暂无搜索结果，请输入关键词后开始搜索。</pre>
+            </div>
+          </div>
         </section>
       </section>
     </main>

@@ -1,4 +1,3 @@
-// Package server 提供 Gin HTTP API。
 package server
 
 import (
@@ -21,11 +20,21 @@ import (
 //go:embed ui/*
 var uiFiles embed.FS
 
-// ReportRunner 表示可被 HTTP 触发的日报生成任务。
+// ReportRunner 表示日报生成任务。
 type ReportRunner func(context.Context, RunReportRequest) (ReportResult, error)
 
-// RunReportRequest 表示 HTTP 触发日报生成时的可选参数。
+// SearchRunner 表示关键词搜索任务。
+type SearchRunner func(context.Context, SearchRequest) (SearchResult, error)
+
+// RunReportRequest 表示日报生成请求。
 type RunReportRequest struct {
+	UserID     string            `json:"user_id"`
+	Preference PreferenceRequest `json:"preference"`
+}
+
+// SearchRequest 表示一次关键词搜索请求。
+type SearchRequest struct {
+	Query      string            `json:"query"`
 	UserID     string            `json:"user_id"`
 	Preference PreferenceRequest `json:"preference"`
 }
@@ -42,7 +51,7 @@ type PreferenceRequest struct {
 	} `json:"weights"`
 }
 
-// ReportResult 表示一次日报生成结果摘要。
+// ReportResult 表示日报执行结果摘要。
 type ReportResult struct {
 	ItemCount         int                     `json:"item_count"`
 	DisplayCount      int                     `json:"display_count"`
@@ -52,10 +61,26 @@ type ReportResult struct {
 	DecisionSummary   []reportDecisionSummary `json:"decision_summary"`
 }
 
+// SearchResult 表示搜索执行结果摘要。
+type SearchResult struct {
+	Query             string                  `json:"query"`
+	ItemCount         int                     `json:"item_count"`
+	DisplayCount      int                     `json:"display_count"`
+	GeneratedAt       time.Time               `json:"generated_at"`
+	Warnings          []string                `json:"warnings"`
+	HighPriorityCount int                     `json:"high_priority_count"`
+	TopPriorityItems  []string                `json:"top_priority_items"`
+	DecisionSummary   []reportDecisionSummary `json:"decision_summary"`
+	Items             []model.NewsItem        `json:"items"`
+	Markdown          string                  `json:"markdown"`
+}
+
 // Options 保存 HTTP 服务选项。
 type Options struct {
 	AuthToken          string
 	UserPreferenceRepo repository.UserPreferenceRepository
+	SearchRepo         repository.SearchRepository
+	SearchRunner       SearchRunner
 }
 
 type reportDecisionSummary struct {
@@ -102,6 +127,8 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Op
 	protected := router.Group("")
 	protected.Use(authMiddleware(options.AuthToken))
 	preferenceRepo := options.UserPreferenceRepo
+	searchRepo := options.SearchRepo
+	searchRunner := options.SearchRunner
 
 	protected.POST("/reports/run", func(ctx *gin.Context) {
 		var request RunReportRequest
@@ -126,6 +153,42 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Op
 			"high_priority_count": result.HighPriorityCount,
 			"top_priority_items":  result.TopPriorityItems,
 			"decision_summary":    result.DecisionSummary,
+		})
+	})
+
+	protected.POST("/search", func(ctx *gin.Context) {
+		if searchRunner == nil {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "search runner not configured"})
+			return
+		}
+		var request SearchRequest
+		if err := ctx.ShouldBindJSON(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+			return
+		}
+		if strings.TrimSpace(request.Query) == "" {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "query is required"})
+			return
+		}
+
+		result, err := searchRunner(ctx.Request.Context(), request)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{
+			"status":              "generated",
+			"query":               result.Query,
+			"item_count":          result.ItemCount,
+			"display_count":       result.DisplayCount,
+			"generated_at":        result.GeneratedAt,
+			"warnings":            result.Warnings,
+			"high_priority_count": result.HighPriorityCount,
+			"top_priority_items":  result.TopPriorityItems,
+			"decision_summary":    result.DecisionSummary,
+			"items":               result.Items,
+			"markdown":            result.Markdown,
 		})
 	})
 
@@ -225,6 +288,58 @@ func NewRouter(repo repository.ReportRepository, runner ReportRunner, options Op
 		ctx.JSON(http.StatusOK, gin.H{"reports": records})
 	})
 
+	protected.GET("/searches/latest", func(ctx *gin.Context) {
+		if searchRepo == nil {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "search repository not configured"})
+			return
+		}
+		record, err := searchRepo.Latest(ctx.Request.Context())
+		if err != nil {
+			if errors.Is(err, repository.ErrReportNotFound) {
+				ctx.JSON(http.StatusNotFound, gin.H{"error": "search not found"})
+				return
+			}
+
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		respondSearch(ctx, record)
+	})
+
+	protected.GET("/searches/:name", func(ctx *gin.Context) {
+		if searchRepo == nil {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "search repository not configured"})
+			return
+		}
+		record, err := searchRepo.Get(ctx.Request.Context(), ctx.Param("name"))
+		if err != nil {
+			if errors.Is(err, repository.ErrReportNotFound) {
+				ctx.JSON(http.StatusNotFound, gin.H{"error": "search not found"})
+				return
+			}
+
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		respondSearch(ctx, record)
+	})
+
+	protected.GET("/searches", func(ctx *gin.Context) {
+		if searchRepo == nil {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "search repository not configured"})
+			return
+		}
+		records, err := searchRepo.List(ctx.Request.Context())
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"searches": records})
+	})
+
 	return router
 }
 
@@ -232,6 +347,21 @@ func respondReport(ctx *gin.Context, record repository.ReportRecord) {
 	overview := buildReportOverview(record.Markdown, record.Items, 3)
 	ctx.JSON(http.StatusOK, gin.H{
 		"generated_at":        record.GeneratedAt,
+		"markdown":            record.Markdown,
+		"items":               record.Items,
+		"display_count":       overview.DisplayCount,
+		"high_priority_count": overview.HighPriorityCount,
+		"decision_summary":    overview.DecisionSummary,
+		"top_priority_items":  overview.TopPriorityItems,
+	})
+}
+
+func respondSearch(ctx *gin.Context, record repository.SearchRecord) {
+	overview := buildReportOverview(record.Markdown, record.Items, 3)
+	ctx.JSON(http.StatusOK, gin.H{
+		"query":               record.Query,
+		"generated_at":        record.GeneratedAt,
+		"warnings":            record.Warnings,
 		"markdown":            record.Markdown,
 		"items":               record.Items,
 		"display_count":       overview.DisplayCount,
@@ -293,6 +423,23 @@ func BuildReportResult(itemCount, displayCount int, generatedAt time.Time, markd
 		HighPriorityCount: overview.HighPriorityCount,
 		TopPriorityItems:  overview.TopPriorityItems,
 		DecisionSummary:   overview.DecisionSummary,
+	}
+}
+
+// BuildSearchResult 根据搜索执行结果构造对外返回。
+func BuildSearchResult(result service.SearchResult, limit int) SearchResult {
+	overview := buildReportOverview(result.Markdown, result.Items, limit)
+	return SearchResult{
+		Query:             result.Query,
+		ItemCount:         result.ItemCount,
+		DisplayCount:      result.DisplayCount,
+		GeneratedAt:       result.GeneratedAt,
+		Warnings:          append([]string(nil), result.Warnings...),
+		HighPriorityCount: overview.HighPriorityCount,
+		TopPriorityItems:  overview.TopPriorityItems,
+		DecisionSummary:   overview.DecisionSummary,
+		Items:             append([]model.NewsItem(nil), result.Items...),
+		Markdown:          result.Markdown,
 	}
 }
 

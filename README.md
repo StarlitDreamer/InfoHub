@@ -462,3 +462,10 @@ This keeps the normal runtime dedup state untouched while generating a fresh rep
 - Add production reverse proxy and HTTPS examples
 - Add richer source health monitoring and retry strategy
 - Refine real AI prompt quality and scoring calibration with production samples
+
+## Search addendum
+
+- Search endpoint: `POST /search`
+- Search history endpoints: `GET /searches`, `GET /searches/latest`, `GET /searches/:name`
+- Search-related environment variables: `INFOHUB_SEARCH_MAX_ITEMS`, `INFOHUB_SEARCH_STORAGE_DIR`, `INFOHUB_MYSQL_SEARCH_TABLE`
+- Default sample search sources cover Stack Overflow, Reddit, and RSS keyword filtering

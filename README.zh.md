@@ -462,3 +462,9 @@ docker exec \
 - 增加生产环境反向代理与 HTTPS 示例
 - 增加更丰富的数据源健康监控与重试策略
 - 结合生产样本继续校准真实 AI 提示词质量与评分
+## 关键词搜索补充说明
+
+- 搜索接口：`POST /search`
+- 搜索历史接口：`GET /searches`、`GET /searches/latest`、`GET /searches/:name`
+- 新增环境变量：`INFOHUB_SEARCH_MAX_ITEMS`、`INFOHUB_SEARCH_STORAGE_DIR`、`INFOHUB_MYSQL_SEARCH_TABLE`
+- 示例配置默认包含 Stack Overflow、Reddit 与 RSS 关键词过滤来源

@@ -28,6 +28,23 @@ func RenderMarkdownBySourceWithWarnings(items []model.NewsItem, warnings []strin
 	return renderMarkdown(items, warnings, true)
 }
 
+// RenderSearchMarkdown 渲染搜索结果 Markdown。
+func RenderSearchMarkdown(query string, items []model.NewsItem, warnings []string) string {
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("# 关键词搜索结果：%s\n\n", query))
+	if len(items) == 0 {
+		builder.WriteString("本次搜索暂无命中结果。\n")
+		return builder.String()
+	}
+
+	renderOverview(&builder, items, warnings)
+	for _, item := range items {
+		renderItem(&builder, item)
+	}
+
+	return builder.String()
+}
+
 func renderMarkdown(items []model.NewsItem, warnings []string, groupBySource bool) string {
 	var builder strings.Builder
 	builder.WriteString("# 今日信息日报\n\n")

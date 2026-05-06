@@ -8,6 +8,50 @@
     "max_items_per_feed": 15,
     "recent_within_hours": 168
   },
+  "search": {
+    "max_items": 10,
+    "storage": {
+      "dir": "data/searches"
+    },
+    "sources": [
+      {
+        "name": "stack-overflow",
+        "kind": "stackexchange",
+        "location": "stackoverflow",
+        "enabled": true,
+        "priority": 4,
+        "timeout_seconds": 10,
+        "max_items": 8
+      },
+      {
+        "name": "reddit-programming",
+        "kind": "reddit",
+        "location": "programming",
+        "enabled": true,
+        "priority": 3,
+        "timeout_seconds": 10,
+        "max_items": 8
+      },
+      {
+        "name": "google-rss-search",
+        "kind": "rss_search",
+        "location": "https://blog.google/rss/",
+        "enabled": true,
+        "priority": 2,
+        "timeout_seconds": 10,
+        "max_items": 6
+      },
+      {
+        "name": "openai-news-search",
+        "kind": "rss_search",
+        "location": "https://openai.com/news/rss.xml",
+        "enabled": true,
+        "priority": 2,
+        "timeout_seconds": 10,
+        "max_items": 6
+      }
+    ]
+  },
   "report": {
     "max_items": 12
   },
@@ -40,7 +84,8 @@
   },
   "mysql": {
     "dsn": "infohub:infohub@tcp(mysql:3306)/infohub?charset=utf8mb4&parseTime=true&loc=Local",
-    "table": "reports"
+    "table": "reports",
+    "search_table": "search_records"
   },
   "scheduler": {
     "interval_seconds": 3600

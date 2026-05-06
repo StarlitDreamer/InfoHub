@@ -12,10 +12,12 @@ import (
 
 const defaultScheduleInterval = time.Hour
 const defaultStorageDir = "data/reports"
+const defaultSearchStorageDir = "data/searches"
 const defaultHTTPAddr = ":8080"
 const defaultDedupStorePath = "data/dedup/seen.json"
 const defaultRedisDedupKey = "infohub:dedup:seen"
 const defaultMySQLTable = "reports"
+const defaultMySQLSearchTable = "search_records"
 const defaultMySQLPreferenceTable = "user_preferences"
 const defaultSMTPPort = 25
 const defaultEmailSubject = "InfoHub 每日报告"
@@ -26,11 +28,13 @@ const defaultPreferenceKeywordWeight = 0.6
 // Config 保存信息汇总 Agent 的运行配置。
 type Config struct {
 	Sources                 []SourceConfig
+	SearchSources           []SearchSourceConfig
 	RSSURL                  string
 	RSSURLs                 []string
 	RSSMaxItems             int
 	RSSRecentWithin         time.Duration
 	ReportMaxItems          int
+	SearchMaxItems          int
 	ReportGroupBySource     bool
 	AIEndpoint              string
 	AIAPIKey                string
@@ -52,6 +56,7 @@ type Config struct {
 	ScheduleInterval        time.Duration
 	ScheduleCron            string
 	StorageDir              string
+	SearchStorageDir        string
 	HTTPAddr                string
 	DedupStorePath          string
 	SendEmptyReport         bool
@@ -62,6 +67,7 @@ type Config struct {
 	RedisDedupKey           string
 	MySQLDSN                string
 	MySQLTable              string
+	MySQLSearchTable        string
 	MySQLPreferenceTable    string
 }
 
@@ -75,6 +81,18 @@ type SourceConfig struct {
 	IncludeInReport bool
 	TimeoutSeconds  int
 	Headers         map[string]string
+}
+
+// SearchSourceConfig 定义搜索型数据源配置。
+type SearchSourceConfig struct {
+	Enabled        bool
+	Name           string
+	Kind           string
+	Location       string
+	Priority       int
+	TimeoutSeconds int
+	MaxItems       int
+	Headers        map[string]string
 }
 
 // Load 先读取 JSON 配置文件，再使用环境变量覆盖。
@@ -141,6 +159,53 @@ func (c Config) SourcesOrDefault() []SourceConfig {
 	}}
 }
 
+// SearchSourcesOrDefault 返回搜索型数据源配置。
+func (c Config) SearchSourcesOrDefault() []SearchSourceConfig {
+	if len(c.SearchSources) > 0 {
+		result := make([]SearchSourceConfig, 0, len(c.SearchSources))
+		for _, source := range c.SearchSources {
+			if strings.TrimSpace(source.Kind) == "" {
+				continue
+			}
+			result = append(result, source)
+		}
+		if len(result) > 0 {
+			return result
+		}
+	}
+
+	result := []SearchSourceConfig{
+		{
+			Enabled:  true,
+			Name:     "stack-overflow",
+			Kind:     "stackexchange",
+			Location: "stackoverflow",
+			Priority: 4,
+			MaxItems: firstPositive(c.SearchMaxItems, 8),
+		},
+		{
+			Enabled:  true,
+			Name:     "reddit-programming",
+			Kind:     "reddit",
+			Location: "programming",
+			Priority: 3,
+			MaxItems: firstPositive(c.SearchMaxItems, 8),
+		},
+	}
+	for _, url := range c.RSSURLs {
+		result = append(result, SearchSourceConfig{
+			Enabled:  true,
+			Name:     url,
+			Kind:     "rss_search",
+			Location: url,
+			Priority: 2,
+			MaxItems: firstPositive(c.SearchMaxItems, c.RSSMaxItems, 8),
+		})
+	}
+
+	return result
+}
+
 // UseRealAI 判断是否启用真实 AI 客户端。
 func (c Config) UseRealAI() bool {
 	return c.AIEndpoint != "" && c.AIAPIKey != "" && c.AIModel != ""
@@ -165,10 +230,12 @@ func defaultConfig() Config {
 	return Config{
 		ScheduleInterval:        defaultScheduleInterval,
 		StorageDir:              defaultStorageDir,
+		SearchStorageDir:        defaultSearchStorageDir,
 		HTTPAddr:                defaultHTTPAddr,
 		DedupStorePath:          defaultDedupStorePath,
 		RedisDedupKey:           defaultRedisDedupKey,
 		MySQLTable:              defaultMySQLTable,
+		MySQLSearchTable:        defaultMySQLSearchTable,
 		MySQLPreferenceTable:    defaultMySQLPreferenceTable,
 		SMTPPort:                defaultSMTPPort,
 		EmailSubject:            defaultEmailSubject,
@@ -197,6 +264,9 @@ func mergeConfig(base, override Config) Config {
 	if len(override.Sources) > 0 {
 		base.Sources = override.Sources
 	}
+	if len(override.SearchSources) > 0 {
+		base.SearchSources = override.SearchSources
+	}
 	if override.RSSURL != "" {
 		base.RSSURL = override.RSSURL
 	}
@@ -211,6 +281,9 @@ func mergeConfig(base, override Config) Config {
 	}
 	if override.ReportMaxItems > 0 {
 		base.ReportMaxItems = override.ReportMaxItems
+	}
+	if override.SearchMaxItems > 0 {
+		base.SearchMaxItems = override.SearchMaxItems
 	}
 	if override.ReportGroupBySource {
 		base.ReportGroupBySource = true
@@ -275,6 +348,9 @@ func mergeConfig(base, override Config) Config {
 	if override.StorageDir != "" {
 		base.StorageDir = override.StorageDir
 	}
+	if override.SearchStorageDir != "" {
+		base.SearchStorageDir = override.SearchStorageDir
+	}
 	if override.HTTPAddr != "" {
 		base.HTTPAddr = override.HTTPAddr
 	}
@@ -305,6 +381,9 @@ func mergeConfig(base, override Config) Config {
 	if override.MySQLTable != "" {
 		base.MySQLTable = override.MySQLTable
 	}
+	if override.MySQLSearchTable != "" {
+		base.MySQLSearchTable = override.MySQLSearchTable
+	}
 	if override.MySQLPreferenceTable != "" {
 		base.MySQLPreferenceTable = override.MySQLPreferenceTable
 	}
@@ -321,6 +400,7 @@ func applyEnv(cfg Config) Config {
 	cfg.RSSMaxItems = readInt("INFOHUB_RSS_MAX_ITEMS_PER_FEED", cfg.RSSMaxItems)
 	cfg.RSSRecentWithin = readHours("INFOHUB_RSS_RECENT_WITHIN_HOURS", cfg.RSSRecentWithin)
 	cfg.ReportMaxItems = readInt("INFOHUB_REPORT_MAX_ITEMS", cfg.ReportMaxItems)
+	cfg.SearchMaxItems = readInt("INFOHUB_SEARCH_MAX_ITEMS", cfg.SearchMaxItems)
 	cfg.AIEndpoint = readString("INFOHUB_AI_ENDPOINT", cfg.AIEndpoint)
 	cfg.AIAPIKey = readString("INFOHUB_AI_API_KEY", cfg.AIAPIKey)
 	cfg.AIModel = readString("INFOHUB_AI_MODEL", cfg.AIModel)
@@ -341,6 +421,7 @@ func applyEnv(cfg Config) Config {
 	cfg.ScheduleCron = readString("INFOHUB_SCHEDULE_CRON", cfg.ScheduleCron)
 	cfg.ScheduleInterval = readDuration("INFOHUB_SCHEDULE_INTERVAL_SECONDS", cfg.ScheduleInterval)
 	cfg.StorageDir = readString("INFOHUB_STORAGE_DIR", cfg.StorageDir)
+	cfg.SearchStorageDir = readString("INFOHUB_SEARCH_STORAGE_DIR", cfg.SearchStorageDir)
 	cfg.HTTPAddr = readString("INFOHUB_HTTP_ADDR", cfg.HTTPAddr)
 	cfg.DedupStorePath = readString("INFOHUB_DEDUP_STORE_PATH", cfg.DedupStorePath)
 	cfg.SendEmptyReport = readBool("INFOHUB_SEND_EMPTY_REPORT", cfg.SendEmptyReport)
@@ -351,6 +432,7 @@ func applyEnv(cfg Config) Config {
 	cfg.RedisDedupKey = readString("INFOHUB_REDIS_DEDUP_KEY", cfg.RedisDedupKey)
 	cfg.MySQLDSN = readString("INFOHUB_MYSQL_DSN", cfg.MySQLDSN)
 	cfg.MySQLTable = readString("INFOHUB_MYSQL_TABLE", cfg.MySQLTable)
+	cfg.MySQLSearchTable = readString("INFOHUB_MYSQL_SEARCH_TABLE", cfg.MySQLSearchTable)
 	cfg.MySQLPreferenceTable = readString("INFOHUB_MYSQL_PREFERENCE_TABLE", cfg.MySQLPreferenceTable)
 
 	return cfg
@@ -358,7 +440,14 @@ func applyEnv(cfg Config) Config {
 
 type fileConfig struct {
 	Sources []sourceFileConfig `json:"sources"`
-	RSS     struct {
+	Search  struct {
+		Sources  []searchSourceFileConfig `json:"sources"`
+		MaxItems int                      `json:"max_items"`
+		Storage  struct {
+			Dir string `json:"dir"`
+		} `json:"storage"`
+	} `json:"search"`
+	RSS struct {
 		URL               string   `json:"url"`
 		URLs              []string `json:"urls"`
 		MaxItemsPerFeed   int      `json:"max_items_per_feed"`
@@ -417,6 +506,7 @@ type fileConfig struct {
 	MySQL struct {
 		DSN             string `json:"dsn"`
 		Table           string `json:"table"`
+		SearchTable     string `json:"search_table"`
 		PreferenceTable string `json:"preference_table"`
 	} `json:"mysql"`
 	Scheduler struct {
@@ -436,12 +526,25 @@ type sourceFileConfig struct {
 	Headers         map[string]string `json:"headers"`
 }
 
+type searchSourceFileConfig struct {
+	Enabled        *bool             `json:"enabled"`
+	Name           string            `json:"name"`
+	Kind           string            `json:"kind"`
+	Location       string            `json:"location"`
+	Priority       int               `json:"priority"`
+	TimeoutSeconds int               `json:"timeout_seconds"`
+	MaxItems       int               `json:"max_items"`
+	Headers        map[string]string `json:"headers"`
+}
+
 func (f fileConfig) toConfig() Config {
 	cfg := Config{
 		Sources:                 make([]SourceConfig, 0, len(f.Sources)),
+		SearchSources:           make([]SearchSourceConfig, 0, len(f.Search.Sources)),
 		RSSURL:                  f.RSS.URL,
 		RSSURLs:                 f.RSS.URLs,
 		RSSMaxItems:             f.RSS.MaxItemsPerFeed,
+		SearchMaxItems:          f.Search.MaxItems,
 		AIEndpoint:              f.AI.Endpoint,
 		AIAPIKey:                f.AI.APIKey,
 		AIModel:                 f.AI.Model,
@@ -462,6 +565,7 @@ func (f fileConfig) toConfig() Config {
 		SendEmptyReport:         f.Webhook.SendEmptyReport,
 		ScheduleCron:            f.Scheduler.Cron,
 		StorageDir:              f.Storage.Dir,
+		SearchStorageDir:        f.Search.Storage.Dir,
 		HTTPAddr:                f.HTTP.Addr,
 		DedupStorePath:          f.Dedup.StorePath,
 		AuthToken:               f.Auth.Token,
@@ -471,6 +575,7 @@ func (f fileConfig) toConfig() Config {
 		RedisDedupKey:           f.Redis.DedupKey,
 		MySQLDSN:                f.MySQL.DSN,
 		MySQLTable:              firstNonEmpty(f.MySQL.Table, defaultMySQLTable),
+		MySQLSearchTable:        firstNonEmpty(f.MySQL.SearchTable, defaultMySQLSearchTable),
 		MySQLPreferenceTable:    firstNonEmpty(f.MySQL.PreferenceTable, defaultMySQLPreferenceTable),
 		ReportMaxItems:          f.Report.MaxItems,
 		ReportGroupBySource:     f.Report.GroupBySource,
@@ -495,6 +600,22 @@ func (f fileConfig) toConfig() Config {
 			Headers:         cloneStringMap(source.Headers),
 		})
 	}
+	for _, source := range f.Search.Sources {
+		enabled := true
+		if source.Enabled != nil {
+			enabled = *source.Enabled
+		}
+		cfg.SearchSources = append(cfg.SearchSources, SearchSourceConfig{
+			Enabled:        enabled,
+			Name:           source.Name,
+			Kind:           source.Kind,
+			Location:       source.Location,
+			Priority:       source.Priority,
+			TimeoutSeconds: source.TimeoutSeconds,
+			MaxItems:       source.MaxItems,
+			Headers:        cloneStringMap(source.Headers),
+		})
+	}
 
 	if f.Scheduler.IntervalSeconds > 0 {
 		cfg.ScheduleInterval = time.Duration(f.Scheduler.IntervalSeconds) * time.Second
@@ -505,6 +626,9 @@ func (f fileConfig) toConfig() Config {
 
 	if len(cfg.RSSURLs) == 0 && cfg.RSSURL != "" {
 		cfg.RSSURLs = []string{cfg.RSSURL}
+	}
+	if cfg.SearchStorageDir == "" {
+		cfg.SearchStorageDir = defaultSearchStorageDir
 	}
 
 	return cfg

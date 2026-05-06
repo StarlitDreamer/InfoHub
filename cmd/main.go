@@ -129,6 +129,11 @@ func runServer(cfg config.Config) error {
 		return err
 	}
 	defer closeRepo()
+	searchRepo, closeSearchRepo, err := newSearchRepository(cfg)
+	if err != nil {
+		return err
+	}
+	defer closeSearchRepo()
 
 	preferenceRepo, closePreferenceRepo, err := newUserPreferenceRepository(cfg)
 	if err != nil {
@@ -149,6 +154,35 @@ func runServer(cfg config.Config) error {
 	}, server.Options{
 		AuthToken:          cfg.AuthToken,
 		UserPreferenceRepo: preferenceRepo,
+		SearchRepo:         searchRepo,
+		SearchRunner: func(ctx context.Context, request server.SearchRequest) (server.SearchResult, error) {
+			preference := request.Preference.ToUserPreference()
+			if request.UserID != "" {
+				stored, err := resolveUserPreference(ctx, preferenceRepo, request.UserID)
+				if err != nil {
+					return server.SearchResult{}, err
+				}
+				preference = mergePreference(stored, preference)
+			}
+
+			agent := service.NewSearchAgent(
+				newSearchCrawler(cfg),
+				newAIProcessor(cfg),
+				searchRepo,
+				cfg.ReportMaxItems,
+				timeNow,
+			)
+			result, err := agent.Run(ctx, service.SearchRequest{
+				Query:      request.Query,
+				UserID:     request.UserID,
+				Preference: preference,
+			})
+			if err != nil {
+				return server.SearchResult{}, err
+			}
+
+			return server.BuildSearchResult(result, 3), nil
+		},
 	})
 
 	return router.Run(cfg.HTTPAddr)
@@ -166,6 +200,19 @@ func newCrawler(cfg config.Config) crawler.Crawler {
 	if err != nil {
 		log.Printf("build crawler failed, fallback to demo source: %v", err)
 		return crawler.NewDemoCrawler()
+	}
+
+	return built
+}
+
+func newSearchCrawler(cfg config.Config) crawler.SearchCrawler {
+	built, err := crawler.BuildSearchFromSources(cfg.SearchSourcesOrDefault(), crawler.SearchFactoryOptions{
+		DefaultMaxItems: cfg.SearchMaxItems,
+		RSSRecentWithin: cfg.RSSRecentWithin,
+	})
+	if err != nil {
+		log.Printf("build search crawler failed: %v", err)
+		return crawler.NewMultiSearchCrawler(nil)
 	}
 
 	return built
@@ -260,6 +307,26 @@ func newReportRepository(cfg config.Config) (repository.ReportRepository, func()
 	}
 
 	repo := repository.NewFileReportRepository(cfg.StorageDir)
+	return repo, func() error { return nil }, nil
+}
+
+func newSearchRepository(cfg config.Config) (repository.SearchRepository, func() error, error) {
+	if cfg.UseMySQL() {
+		db, err := sql.Open("mysql", cfg.MySQLDSN)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		repo, err := repository.NewMySQLSearchRepository(db, cfg.MySQLSearchTable)
+		if err != nil {
+			_ = db.Close()
+			return nil, nil, err
+		}
+
+		return repo, repo.Close, nil
+	}
+
+	repo := repository.NewFileSearchRepository(cfg.SearchStorageDir)
 	return repo, func() error { return nil }, nil
 }
 
